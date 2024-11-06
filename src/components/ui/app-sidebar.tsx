@@ -36,15 +36,16 @@ export function AppSidebar() {
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <Link to={item.url}>
+                    {/* TODO fix link crashing the app */}
+                    {/* <Link to={item.url}> */}
                     <span>
-                           {item.title}
+                      {item.title}
                     </span>
                     {/* <a href={item.url}>
                       <item.icon />
                       <span>{item.title}</span>
                     </a> */}
-                    </Link>
+                    {/* </Link> */}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
