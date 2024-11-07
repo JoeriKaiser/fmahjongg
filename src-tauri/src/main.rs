@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    fmohjangg_lib::run()
+    fmahjongg_lib::run()
 }

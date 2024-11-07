@@ -737,7 +737,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "fmohjangg"
+name = "fmahjongg"
 version = "0.1.0"
 dependencies = [
  "serde",
