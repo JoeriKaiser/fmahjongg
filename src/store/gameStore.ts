@@ -6,11 +6,14 @@ interface GameState {
   tiles: TileData[];
   selectedTile: TileData | null;
   gameOver: boolean;
+  setGameOver: (gameOver: boolean) => void;
   possibleMoves: number;
   getPossibleMoves: () => number;
   selectTile: (tile: TileData) => void;
   removePair: (tile1: TileData, tile2: TileData) => void;
   resetGame: () => void;
+  isLoading: boolean;
+  setLoading: (loading: boolean) => void;
 }
 
 function createTileGrid(tiles: TileData[]) {
@@ -68,6 +71,7 @@ export const useGameStore = zu.create<GameState>((set, get) => ({
   selectedTile: null,
   gameOver: false,
   possibleMoves: 0,
+  isLoading: false,
 
   selectTile: (tile) =>
     set((state) => {
@@ -101,7 +105,20 @@ export const useGameStore = zu.create<GameState>((set, get) => ({
       )
     })),
 
-  resetGame: () => set({ tiles: generateInitialLayout(), gameOver: false }),
+  setLoading: (loading: boolean) => set({ isLoading: loading }),
+  setGameOver: (gameOver: boolean) => set({ gameOver }),
+
+  resetGame: () => {
+    set({ isLoading: true });
+
+    setTimeout(() => {
+      set({
+        tiles: generateInitialLayout(),
+        gameOver: false,
+        isLoading: false
+      });
+    }, 100);
+  },
 
   getPossibleMoves: () => {
     const state = get();
@@ -126,6 +143,10 @@ export const useGameStore = zu.create<GameState>((set, get) => ({
           counted.add(`${tile1.id}-${tile2.id}`);
         }
       }
+    }
+
+    if (possiblePairs === 0) {
+      set((state) => ({ ...state, gameOver: true }));
     }
 
     set((state) => ({ ...state, possibleMoves: possiblePairs }));
