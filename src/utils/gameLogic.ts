@@ -1,27 +1,32 @@
-import { TileData } from './layoutGenerator';
+import { TILE_SYMBOLS, TileData } from './layoutGenerator';
 
-export function canMatch(tile1: TileData, tile2: TileData): boolean {
+interface TileNeighbors {
+  top: boolean;
+  left: boolean;
+  right: boolean;
+}
+
+export function canMatch(
+  tile1: TileData,
+  tile2: TileData,
+  tile1Neighbors: TileNeighbors,
+  tile2Neighbors: TileNeighbors
+): boolean {
   if (tile1.id === tile2.id) return false;
-  if (tile1.symbol !== tile2.symbol) return false;
   if (tile1.isRemoved || tile2.isRemoved) return false;
 
-  return isAccessible(tile1) && isAccessible(tile2);
+  if (!isAccessible(tile1Neighbors) || !isAccessible(tile2Neighbors)) return false;
+
+  const isSeasonTile = (tile: TileData) => TILE_SYMBOLS.seasons.includes(tile.symbol);
+  const isFlowerTile = (tile: TileData) => TILE_SYMBOLS.flowers.includes(tile.symbol);
+
+  if (isSeasonTile(tile1) && isSeasonTile(tile2)) return true;
+
+  if (isFlowerTile(tile1) && isFlowerTile(tile2)) return true;
+
+  return tile1.symbol === tile2.symbol;
 }
 
-function hasTopNeighbor(tile: TileData): boolean {
-  return tile.position.y > 0;
-}
-
-function hasLeftFree(tile: TileData): boolean {
-  return tile.position.x > 0;
-}
-
-function hasRightFree(tile: TileData): boolean {
-  return tile.position.x < 1;
-}
-
-export function isAccessible(tile: TileData): boolean {
-  // A tile is accessible if it has no tile directly above it
-  // and at least one side (left or right) is free
-  return !hasTopNeighbor(tile) && (hasLeftFree(tile) || hasRightFree(tile));
+export function isAccessible(neighbors: TileNeighbors): boolean {
+  return !neighbors.top && (!neighbors.left || !neighbors.right);
 }

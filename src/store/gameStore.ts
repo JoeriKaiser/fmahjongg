@@ -1,21 +1,6 @@
 import { canMatch } from '@/utils/gameLogic';
-import { generateInitialLayout } from '@/utils/layoutGenerator';
+import { generateInitialLayout, TileData } from '@/utils/layoutGenerator';
 import * as zu from 'zustand';
-
-interface Position {
-  x: number;
-  y: number;
-  z: number;
-}
-
-interface TileData {
-  id: string;
-  symbol: string;
-  position: Position;
-  layer: number;
-  isSelected: boolean;
-  isRemoved: boolean;
-}
 
 interface GameState {
   tiles: TileData[];
@@ -27,6 +12,26 @@ interface GameState {
   resetGame: () => void;
 }
 
+function createTileGrid(tiles: TileData[]) {
+  const grid: { [key: string]: TileData } = {};
+  tiles.forEach((tile) => {
+    if (!tile.isRemoved) {
+      const key = `${tile.gridPosition.x},${tile.gridPosition.y},${tile.gridPosition.z}`;
+      grid[key] = tile;
+    }
+  });
+  return grid;
+}
+
+function getNeighbors(tile: TileData, grid: { [key: string]: TileData }) {
+  const { x, y, z } = tile.gridPosition;
+  return {
+    top: Boolean(grid[`${x},${y + 1},${z}`]),
+    left: Boolean(grid[`${x - 1},${y},${z}`]),
+    right: Boolean(grid[`${x + 1},${y},${z}`])
+  };
+}
+
 export const useGameStore = zu.create<GameState>((set) => ({
   tiles: [],
   selectedTile: null,
@@ -35,17 +40,22 @@ export const useGameStore = zu.create<GameState>((set) => ({
 
   selectTile: (tile) =>
     set((state) => {
-      // First, clear any previous selection
       const clearedSelections = state.tiles.map((t) => ({ ...t, isSelected: false }));
+      const grid = createTileGrid(state.tiles);
 
-      if (state.selectedTile && canMatch(state.selectedTile, tile)) {
-        return {
-          selectedTile: null,
-          tiles: clearedSelections.map((t) =>
-            t.id === tile.id || t.id === state.selectedTile?.id ? { ...t, isRemoved: true } : t
-          ),
-          score: state.score + 10
-        };
+      if (state.selectedTile) {
+        const tile1Neighbors = getNeighbors(state.selectedTile, grid);
+        const tile2Neighbors = getNeighbors(tile, grid);
+
+        if (canMatch(state.selectedTile, tile, tile1Neighbors, tile2Neighbors)) {
+          return {
+            selectedTile: null,
+            tiles: clearedSelections.map((t) =>
+              t.id === tile.id || t.id === state.selectedTile?.id ? { ...t, isRemoved: true } : t
+            ),
+            score: state.score + 10
+          };
+        }
       }
 
       return {

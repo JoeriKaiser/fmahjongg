@@ -49,7 +49,7 @@ export function MahjongGame() {
         <directionalLight position={[-10, 10, -5]} intensity={0.4} />
 
         {/* Center the entire board */}
-        <group position={[0, 5, 0]}>
+        <group position={[0, 0, 0]}>
           {tiles.map((tile, index) => (
             <MahjongTile
               key={`${tile.id}-${index}`}

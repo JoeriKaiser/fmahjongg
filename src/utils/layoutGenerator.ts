@@ -6,6 +6,11 @@ export interface TileData {
     y: number;
     z: number;
   };
+  gridPosition: {
+    x: number;
+    y: number;
+    z: number;
+  };
   layer: number;
   isSelected: boolean;
   isRemoved: boolean;
@@ -69,40 +74,66 @@ const LAYER_LAYOUTS = [
   ]
 ];
 
-const TILE_SYMBOLS = [
-  'Chun',
-  'Haku',
-  'Hatsu',
-  'Man1',
-  'Man2',
-  'Man3',
-  'Man4',
-  'Man5',
-  'Man6',
-  'Man7',
-  'Man8',
-  'Man9',
-  'Pin1',
-  'Pin2',
-  'Pin3',
-  'Pin4',
-  'Pin5',
-  'Pin6',
-  'Pin7',
-  'Pin8',
-  'Pin9',
-  'Sou1',
-  'Sou2',
-  'Sou3',
-  'Sou4',
-  'Sou5',
-  'Sou6',
-  'Sou7',
-  'Sou8',
-  'Sou9',
-  'Ton',
-  'Shaa'
-];
+export const TILE_SYMBOLS = {
+  // Suits (4 copies each)
+  suits: {
+    man: ['Man1', 'Man2', 'Man3', 'Man4', 'Man5'],
+    pin: ['Pin1', 'Pin2', 'Pin3', 'Pin4', 'Pin5'],
+    sou: ['Sou1', 'Sou2', 'Sou3', 'Sou4', 'Sou5']
+  },
+  // Honors (4 copies each)
+  // TODO FIND WIND DESIGNS
+  winds: ['Nan', 'Pei', 'Ton', 'Man5-Dora', 'Nan', 'Pei', 'Ton'],
+  dragons: ['Chun', 'Haku', 'Hatsu', 'Chun', 'Haku', 'Hatsu'],
+  // Bonus tiles (4 copies each)
+  // TODO find season designs
+  seasons: ['Man6', 'Man7', 'Man8', 'Man9'],
+  // TODO find flower designs
+  flowers: ['Sou6', 'Sou7', 'Sou8', 'Sou9']
+};
+
+function generateTileDeck(): string[] {
+  const deck: string[] = [];
+
+  // Add suits (4 copies each)
+  Object.values(TILE_SYMBOLS.suits).forEach((suit) => {
+    suit.forEach((tile) => {
+      for (let i = 0; i < 4; i++) {
+        deck.push(tile);
+      }
+    });
+  });
+
+  // Add winds (4 copies each)
+  TILE_SYMBOLS.winds.forEach((wind) => {
+    for (let i = 0; i < 4; i++) {
+      deck.push(wind);
+    }
+  });
+
+  // Add dragons (4 copies each)
+  TILE_SYMBOLS.dragons.forEach((dragon) => {
+    for (let i = 0; i < 4; i++) {
+      deck.push(dragon);
+    }
+  });
+
+  // Add seasons (4 copies each)
+  TILE_SYMBOLS.seasons.forEach((season) => {
+    for (let i = 0; i < 4; i++) {
+      deck.push(season);
+    }
+  });
+
+  // Add flowers (4 copies each)
+  TILE_SYMBOLS.flowers.forEach((flower) => {
+    for (let i = 0; i < 4; i++) {
+      deck.push(flower);
+    }
+  });
+
+  return shuffleArray(deck);
+}
 
 function shuffleArray<T>(array: T[]): T[] {
   for (let i = array.length - 1; i > 0; i--) {
@@ -126,47 +157,61 @@ const CENTER_OFFSET = {
 export function generateInitialLayout(): TileData[] {
   const tiles: TileData[] = [];
   let id = 0;
+  const deck = generateTileDeck();
+  let deckIndex = 0;
 
   LAYER_LAYOUTS.forEach((layer, layerIndex) => {
     layer.forEach((row, rowIndex) => {
       row.forEach((tileType, colIndex) => {
         if (tileType === 1) {
-          // Normal tile
           tiles.push({
             id: `${String(id++)}-${layerIndex}-${rowIndex}-${colIndex}`,
-            symbol: TILE_SYMBOLS[Math.floor(Math.random() * TILE_SYMBOLS.length)],
+            symbol: deck[deckIndex++],
             position: {
               x: colIndex * SPACING.X + CENTER_OFFSET.X,
               y: layerIndex * SPACING.Y,
               z: rowIndex * SPACING.Z + CENTER_OFFSET.Z
+            },
+            gridPosition: {
+              x: colIndex,
+              y: layerIndex,
+              z: rowIndex
             },
             layer: layerIndex,
             isSelected: false,
             isRemoved: false
           });
         } else if (tileType === 2) {
-          // Split tile horizontally
           tiles.push({
             id: `${String(id++)}-${layerIndex}-${rowIndex}-${colIndex}-split`,
-            symbol: TILE_SYMBOLS[Math.floor(Math.random() * TILE_SYMBOLS.length)],
+            symbol: deck[deckIndex++],
             position: {
               x: colIndex * SPACING.X + CENTER_OFFSET.X,
               y: layerIndex * SPACING.Y,
-              z: (rowIndex + 0.5) * SPACING.Z + CENTER_OFFSET.Z // Position between rows
+              z: (rowIndex + 0.5) * SPACING.Z + CENTER_OFFSET.Z
+            },
+            gridPosition: {
+              x: colIndex,
+              y: layerIndex,
+              z: rowIndex
             },
             layer: layerIndex,
             isSelected: false,
             isRemoved: false
           });
         } else if (tileType === 3) {
-          // Split tile horizontally and vertically
           tiles.push({
             id: `${String(id++)}-${layerIndex}-${rowIndex}-${colIndex}-split`,
-            symbol: TILE_SYMBOLS[Math.floor(Math.random() * TILE_SYMBOLS.length)],
+            symbol: deck[deckIndex++],
             position: {
               x: (colIndex + 0.5) * SPACING.X + CENTER_OFFSET.X,
               y: layerIndex * SPACING.Y,
-              z: (rowIndex + 0.5) * SPACING.Z + CENTER_OFFSET.Z // Position between rows
+              z: (rowIndex + 0.5) * SPACING.Z + CENTER_OFFSET.Z
+            },
+            gridPosition: {
+              x: colIndex,
+              y: layerIndex,
+              z: rowIndex
             },
             layer: layerIndex,
             isSelected: false,
@@ -177,6 +222,5 @@ export function generateInitialLayout(): TileData[] {
     });
   });
 
-  // Ensure pairs exist by duplicating and shuffling
   return shuffleArray([...tiles, ...tiles]);
 }
