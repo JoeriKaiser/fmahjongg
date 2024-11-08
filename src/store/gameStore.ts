@@ -5,8 +5,9 @@ import * as zu from 'zustand';
 interface GameState {
   tiles: TileData[];
   selectedTile: TileData | null;
-  score: number;
   gameOver: boolean;
+  possibleMoves: number;
+  getPossibleMoves: () => number;
   selectTile: (tile: TileData) => void;
   removePair: (tile1: TileData, tile2: TileData) => void;
   resetGame: () => void;
@@ -62,11 +63,11 @@ function getNeighbors(tile: TileData, grid: { [key: string]: TileData[] }) {
   };
 }
 
-export const useGameStore = zu.create<GameState>((set) => ({
+export const useGameStore = zu.create<GameState>((set, get) => ({
   tiles: [],
   selectedTile: null,
-  score: 0,
   gameOver: false,
+  possibleMoves: 0,
 
   selectTile: (tile) =>
     set((state) => {
@@ -82,8 +83,7 @@ export const useGameStore = zu.create<GameState>((set) => ({
             selectedTile: null,
             tiles: clearedSelections.map((t) =>
               t.id === tile.id || t.id === state.selectedTile?.id ? { ...t, isRemoved: true } : t
-            ),
-            score: state.score + 10
+            )
           };
         }
       }
@@ -101,5 +101,34 @@ export const useGameStore = zu.create<GameState>((set) => ({
       )
     })),
 
-  resetGame: () => set({ tiles: generateInitialLayout(), score: 0, gameOver: false })
+  resetGame: () => set({ tiles: generateInitialLayout(), gameOver: false }),
+
+  getPossibleMoves: () => {
+    const state = get();
+    const grid = createTileGrid(state.tiles);
+    const activeTiles = state.tiles.filter((tile) => !tile.isRemoved);
+    let possiblePairs = 0;
+    const counted = new Set<string>();
+
+    for (let i = 0; i < activeTiles.length; i++) {
+      for (let j = i + 1; j < activeTiles.length; j++) {
+        const tile1 = activeTiles[i];
+        const tile2 = activeTiles[j];
+        const tile1Neighbors = getNeighbors(tile1, grid);
+        const tile2Neighbors = getNeighbors(tile2, grid);
+
+        if (
+          canMatch(tile1, tile2, tile1Neighbors, tile2Neighbors) &&
+          !counted.has(`${tile1.id}-${tile2.id}`) &&
+          !counted.has(`${tile2.id}-${tile1.id}`)
+        ) {
+          possiblePairs++;
+          counted.add(`${tile1.id}-${tile2.id}`);
+        }
+      }
+    }
+
+    set((state) => ({ ...state, possibleMoves: possiblePairs }));
+    return possiblePairs;
+  }
 }));

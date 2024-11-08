@@ -9,9 +9,10 @@ import * as THREE from 'three';
 
 export function MahjongGame() {
   const tiles = useGameStore((state) => state.tiles);
-  const score = useGameStore((state) => state.score);
   const resetGame = useGameStore((state) => state.resetGame);
   const cameraRef = useRef<THREE.PerspectiveCamera>(null);
+  const possibleMoves = useGameStore((state) => state.possibleMoves);
+  const getPossibleMoves = useGameStore((state) => state.getPossibleMoves);
 
   useEffect(() => {
     if (cameraRef.current) {
@@ -20,10 +21,16 @@ export function MahjongGame() {
     }
   }, []);
 
+  useEffect(() => {
+    if (tiles.length > 0) {
+      getPossibleMoves();
+    }
+  }, [tiles, getPossibleMoves]);
+
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
       <div style={{ position: 'absolute', top: 20, left: 20 }}>
-        Score: {score}
+        Remaining moves: {possibleMoves ?? 0}
         <Button onClick={resetGame}>Reset Game</Button>
       </div>
       <Canvas shadows>
