@@ -32,7 +32,9 @@ export function MahjongGame() {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-screen bg-gradient-to-b from-slate-900 to-slate-800 flex items-center justify-center">
+      <div
+        id="main"
+        className="h-screen w-screen bg-gradient-to-b from-slate-900 to-slate-800 flex items-center justify-center">
         <div className="text-white flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin" />
           <p className="text-lg">Loading game...</p>
@@ -43,7 +45,9 @@ export function MahjongGame() {
 
   if (gameOver) {
     return (
-      <div className="h-screen w-screen bg-gradient-to-b from-slate-900 to-slate-800 flex items-center justify-center">
+      <div
+        id="main"
+        className="h-screen w-screen bg-gradient-to-b from-slate-900 to-slate-800 flex items-center justify-center">
         <div className="text-white flex flex-col items-center gap-4">
           <p className="text-lg">Game Over!</p>
           <Button variant="default" onClick={resetGame}>
@@ -56,7 +60,7 @@ export function MahjongGame() {
   }
 
   return (
-    <div className="relative h-screen w-screen bg-gradient-to-b from-slate-900 to-slate-800">
+    <div id="main" className="relative h-screen w-screen">
       <div className="absolute left-4 top-4 z-10 space-y-4">
         <Card className="w-64 bg-slate-800/90 text-white shadow-xl">
           <CardHeader className="pb-2">
@@ -79,7 +83,7 @@ export function MahjongGame() {
 
       <div className="h-full w-full">
         <Canvas shadows className="h-full w-full">
-          <PerspectiveCamera ref={cameraRef} makeDefault fov={50} near={0.1} far={1000} />
+          <PerspectiveCamera ref={cameraRef} makeDefault fov={75} near={0.1} far={1000} />
           <OrbitControls
             enablePan={true}
             enableZoom={true}
