@@ -4,6 +4,7 @@ interface TileNeighbors {
   top: boolean;
   left: boolean;
   right: boolean;
+  splitAbove: boolean;
 }
 
 export function canMatch(
@@ -28,5 +29,7 @@ export function canMatch(
 }
 
 export function isAccessible(neighbors: TileNeighbors): boolean {
+  if (neighbors.splitAbove) return false;
+
   return !neighbors.top && (!neighbors.left || !neighbors.right);
 }

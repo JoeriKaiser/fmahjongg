@@ -22,8 +22,8 @@ const LAYER_LAYOUTS = [
     [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
     [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
     [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
-    [2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2], // Added '2' for split tile
-    [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0], // Added '3' for split tile
+    [2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2], // Tyle 2 (split)
+    [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
     [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
     [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
     [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0]
@@ -55,8 +55,8 @@ const LAYER_LAYOUTS = [
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0], // Added '2' for split tile
-    [0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0], // Added '3' for split tile
+    [0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0], // Tyle 2 (split)
+    [0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0],
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -77,19 +77,19 @@ const LAYER_LAYOUTS = [
 export const TILE_SYMBOLS = {
   // Suits (4 copies each)
   suits: {
-    man: ['Man1', 'Man2', 'Man3', 'Man4', 'Man5'],
-    pin: ['Pin1', 'Pin2', 'Pin3', 'Pin4', 'Pin5'],
-    sou: ['Sou1', 'Sou2', 'Sou3', 'Sou4', 'Sou5']
+    man: ['Man1', 'Man2', 'Man3', 'Man4', 'Man5', 'Man6', 'Man7', 'Man8', 'Man9'],
+    pin: ['Pin1', 'Pin2', 'Pin3', 'Pin4', 'Pin5', 'Pin6', 'Pin7', 'Pin8', 'Pin9'],
+    sou: ['Sou1', 'Sou2', 'Sou3', 'Sou4', 'Sou5', 'Sou6', 'Sou7', 'Sou8', 'Sou9']
   },
   // Honors (4 copies each)
   // TODO FIND WIND DESIGNS
-  winds: ['Nan', 'Pei', 'Ton', 'Man5-Dora', 'Nan', 'Pei', 'Ton'],
-  dragons: ['Chun', 'Haku', 'Hatsu', 'Chun', 'Haku', 'Hatsu'],
+  winds: ['Nan', 'Pei', 'Ton'],
+  dragons: ['Chun', 'Haku', 'Hatsu'],
   // Bonus tiles (4 copies each)
   // TODO find season designs
-  seasons: ['Man6', 'Man7', 'Man8', 'Man9'],
+  seasons: ['Shaa', 'Man5-Dora', 'Shaa', 'Man5-Dora'],
   // TODO find flower designs
-  flowers: ['Sou6', 'Sou7', 'Sou8', 'Sou9']
+  flowers: ['Pin5-Dora', 'Sou5-Dora', 'Pin5-Dora', 'Sou5-Dora']
 };
 
 function generateTileDeck(): string[] {
@@ -143,13 +143,13 @@ function shuffleArray<T>(array: T[]): T[] {
   return array;
 }
 
-const SPACING = {
+export const SPACING = {
   X: 1.1,
   Y: 0.52,
   Z: 1.6
 };
 
-const CENTER_OFFSET = {
+export const CENTER_OFFSET = {
   X: -8.4, // -(14 tiles * SPACING.X) / 2
   Z: -5.6 // -(8 rows * SPACING.Z) / 2
 };

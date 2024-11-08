@@ -1,5 +1,5 @@
 import { canMatch } from '@/utils/gameLogic';
-import { generateInitialLayout, TileData } from '@/utils/layoutGenerator';
+import { CENTER_OFFSET, generateInitialLayout, SPACING, TileData } from '@/utils/layoutGenerator';
 import * as zu from 'zustand';
 
 interface GameState {
@@ -13,22 +13,52 @@ interface GameState {
 }
 
 function createTileGrid(tiles: TileData[]) {
-  const grid: { [key: string]: TileData } = {};
+  const grid: { [key: string]: TileData[] } = {};
+
   tiles.forEach((tile) => {
     if (!tile.isRemoved) {
-      const key = `${tile.gridPosition.x},${tile.gridPosition.y},${tile.gridPosition.z}`;
-      grid[key] = tile;
+      if (tile.id.includes('split')) {
+        const { x, y, z } = tile.gridPosition;
+        const positions = [];
+
+        // Type 2 tiles (shifted down)
+        if (tile.position.x === x * SPACING.X + CENTER_OFFSET.X) {
+          positions.push(
+            `${x},${y},${z}`, // Base position
+            `${x},${y},${z + 1}` // Position below
+          );
+        }
+        // Type 3 tiles (shifted down and right)
+        else {
+          positions.push(
+            `${x},${y},${z}`, // Base position
+            `${x},${y},${z + 1}`, // Position below
+            `${x + 1},${y},${z}`, // Position right
+            `${x + 1},${y},${z + 1}` // Position diagonal
+          );
+        }
+
+        positions.forEach((key) => {
+          grid[key] = grid[key] || [];
+          grid[key].push(tile);
+        });
+      } else {
+        const key = `${tile.gridPosition.x},${tile.gridPosition.y},${tile.gridPosition.z}`;
+        grid[key] = grid[key] || [];
+        grid[key].push(tile);
+      }
     }
   });
   return grid;
 }
 
-function getNeighbors(tile: TileData, grid: { [key: string]: TileData }) {
+function getNeighbors(tile: TileData, grid: { [key: string]: TileData[] }) {
   const { x, y, z } = tile.gridPosition;
   return {
-    top: Boolean(grid[`${x},${y + 1},${z}`]),
-    left: Boolean(grid[`${x - 1},${y},${z}`]),
-    right: Boolean(grid[`${x + 1},${y},${z}`])
+    top: Boolean(grid[`${x},${y + 1},${z}`]?.length),
+    left: Boolean(grid[`${x - 1},${y},${z}`]?.length),
+    right: Boolean(grid[`${x + 1},${y},${z}`]?.length),
+    splitAbove: grid[`${x},${y + 1},${z - 1}`]?.some((t) => t.id.includes('split')) ?? false
   };
 }
 

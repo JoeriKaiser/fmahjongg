@@ -11,7 +11,9 @@ export function MahjongTile({ tile }: { tile: TileData }) {
 
   const handleClick = (event: ThreeEvent<MouseEvent>) => {
     // Handles click only if the tile is accessible due to textures being transparent
-    event.stopPropagation();
+    if (!tile.isRemoved) {
+      event.stopPropagation();
+    }
     selectTile(tile);
   };
 
