@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, RotateCcw } from 'lucide-react';
 import * as THREE from 'three';
+import { SplashTile } from '../show/SplashTile';
 
 export function MahjongGame() {
   const tiles = useGameStore((state) => state.tiles);
@@ -59,6 +60,32 @@ export function MahjongGame() {
     );
   }
 
+  if (!tiles.length) {
+    return (
+      <div id="main" className="h-screen w-screen bg-gradient-to-b from-slate-900 to-slate-800">
+        <div className="h-full w-full flex flex-col items-center justify-center">
+          <div className="text-white flex flex-col items-center gap-6">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+              Welcome to Fast Mahjong
+            </h1>
+            <p className="text-lg text-slate-300 tracking-wide">
+              Experience the classic game reimagined
+            </p>
+          </div>
+          <div className="w-64 h-64">
+            <SplashTile />
+          </div>
+          <Button
+            variant="default"
+            className="mt-8 bg-slate-700 hover:bg-slate-600"
+            onClick={resetGame}>
+            Start Game
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div id="main" className="relative h-screen w-screen">
       <div className="absolute left-4 top-4 z-10 space-y-4">
@@ -83,25 +110,33 @@ export function MahjongGame() {
 
       <div className="h-full w-full">
         <Canvas shadows className="h-full w-full">
-          <PerspectiveCamera ref={cameraRef} makeDefault fov={75} near={0.1} far={1000} />
+          <PerspectiveCamera
+            ref={cameraRef}
+            makeDefault
+            fov={75}
+            near={0.1}
+            far={1000}
+            rotation={[-0.3, -0.5, -0.2]}
+          />
           <OrbitControls
             enablePan={true}
             enableZoom={true}
-            maxPolarAngle={Math.PI / 8}
+            maxPolarAngle={Math.PI / 2}
+            minPolarAngle={Math.PI / 12}
             minDistance={10}
             maxDistance={30}
             target={[0, 0, 0]}
           />
 
-          <ambientLight intensity={0.5} />
+          <ambientLight intensity={0.4} />
           <directionalLight
-            position={[10, 10, 5]}
-            intensity={0.8}
+            position={[15, 15, 5]}
+            intensity={0.7}
             castShadow
             shadow-mapSize-width={2048}
             shadow-mapSize-height={2048}
           />
-          <directionalLight position={[-10, 10, -5]} intensity={0.4} />
+          <directionalLight position={[-10, 12, -5]} intensity={0.3} />
 
           <group position={[0, 0, 0]}>
             {tiles.map((tile, index) => (
