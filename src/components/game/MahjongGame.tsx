@@ -2,7 +2,7 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { useGameStore } from '@/store/gameStore';
 import { MahjongTile } from './MahjongTile';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, RotateCcw } from 'lucide-react';
@@ -10,6 +10,8 @@ import * as THREE from 'three';
 import { SplashTile } from '../show/SplashTile';
 
 export function MahjongGame() {
+  const [showControls, setShowControls] = useState(false);
+
   const tiles = useGameStore((state) => state.tiles);
   const resetGame = useGameStore((state) => state.resetGame);
   const cameraRef = useRef<THREE.PerspectiveCamera>(null);
@@ -154,6 +156,32 @@ export function MahjongGame() {
             ))}
           </group>
         </Canvas>
+      </div>
+      <div className="absolute bottom-4 right-4 z-10">
+        <div className="relative">
+          <Button
+            variant="default"
+            size="sm"
+            className="bg-slate-800/90 hover:bg-slate-700/90"
+            onClick={() => setShowControls(!showControls)}>
+            <span className="text-sm">🎮</span>
+          </Button>
+
+          {showControls && (
+            <Card className="absolute bottom-12 right-0 w-64 bg-slate-800/90 text-white shadow-xl">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-bold">Controls</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="text-xs space-y-1">
+                  <li>🖱️ Left Click + Drag: Rotate camera</li>
+                  <li>🖱️ Right Click + Drag: Pan camera</li>
+                  <li>🖱️ Scroll Wheel: Zoom in/out</li>
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
     </div>
   );
