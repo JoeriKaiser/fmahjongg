@@ -1,4 +1,4 @@
-import { Home, Inbox } from "lucide-react"
+import { Home, Inbox } from 'lucide-react';
 
 import {
   Sidebar,
@@ -8,22 +8,21 @@ import {
   SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar"
-import { Link } from 'react-router-dom'
+  SidebarMenuItem
+} from '@/components/ui/sidebar';
 
 const items = [
   {
-    title: "Home",
-    url: "/",
-    icon: Home,
+    title: 'Home',
+    url: '/',
+    icon: Home
   },
   {
-    title: "Notes",
-    url: "/notes",
-    icon: Inbox,
-  },
-]
+    title: 'Notes',
+    url: '/notes',
+    icon: Inbox
+  }
+];
 
 export function AppSidebar() {
   return (
@@ -38,9 +37,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     {/* TODO fix link crashing the app */}
                     {/* <Link to={item.url}> */}
-                    <span>
-                      {item.title}
-                    </span>
+                    <span>{item.title}</span>
                     {/* <a href={item.url}>
                       <item.icon />
                       <span>{item.title}</span>
@@ -54,5 +51,5 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
     </Sidebar>
-  )
+  );
 }
