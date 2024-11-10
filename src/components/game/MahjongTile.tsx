@@ -18,12 +18,16 @@ export function MahjongTile({ tile }: { tile: TileData }) {
   };
 
   return (
-    <group
-      ref={meshRef}
-      position={[tile.position.x, tile.position.y, tile.position.z]}
-      onClick={handleClick}
-      visible={!tile.isRemoved}>
-      <TileModel tile={tile} />
-    </group>
+    <>
+      {!tile.isRemoved && (
+        <group
+          ref={meshRef}
+          position={[tile.position.x, tile.position.y, tile.position.z]}
+          onClick={handleClick}
+          visible={!tile.isRemoved}>
+          <TileModel tile={tile} />
+        </group>
+      )}
+    </>
   );
 }

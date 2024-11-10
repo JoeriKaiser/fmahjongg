@@ -22,7 +22,7 @@ const LAYER_LAYOUTS = [
     [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
     [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
     [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
-    [2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2], // Tyle 2 (split)
+    [2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2], // Tile 2 (split)
     [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
     [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
     [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
@@ -55,7 +55,7 @@ const LAYER_LAYOUTS = [
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0], // Tyle 2 (split)
+    [0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0], // Tile 2 (split)
     [0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0],
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -75,58 +75,50 @@ const LAYER_LAYOUTS = [
 ];
 
 export const TILE_SYMBOLS = {
-  // Suits (4 copies each)
   suits: {
     man: ['Man1', 'Man2', 'Man3', 'Man4', 'Man5', 'Man6', 'Man7', 'Man8', 'Man9'],
     pin: ['Pin1', 'Pin2', 'Pin3', 'Pin4', 'Pin5', 'Pin6', 'Pin7', 'Pin8', 'Pin9'],
     sou: ['Sou1', 'Sou2', 'Sou3', 'Sou4', 'Sou5', 'Sou6', 'Sou7', 'Sou8', 'Sou9']
   },
-  // Honors (4 copies each)
   winds: ['North', 'South', 'East', 'West'],
   dragons: ['Chun', 'Haku', 'Hatsu'],
-  // Bonus tiles (4 copies each)
-  seasons: ['Season1', 'Season2', 'Season3', 'Season4'],
+  seasons: ['Season1', 'Season2'],
   flowers: ['Bamboo1', 'Bamboo2', 'Bamboo3', 'Bamboo4']
 };
 
 function generateTileDeck(): string[] {
   const deck: string[] = [];
+  const tileCount: { [key: string]: number } = {};
 
-  // Add suits (4 copies each)
+  const addTilePairs = (tileType: string) => {
+    deck.push(tileType, tileType); // Add pairs together
+    tileCount[tileType] = (tileCount[tileType] || 0) + 2;
+  };
+
+  // Add suits (4 copies each = 2 pairs)
   Object.values(TILE_SYMBOLS.suits).forEach((suit) => {
     suit.forEach((tile) => {
-      for (let i = 0; i < 4; i++) {
-        deck.push(tile);
-      }
+      addTilePairs(tile);
+      addTilePairs(tile);
     });
   });
 
-  // Add winds (4 copies each)
+  // Add winds (4 copies each = 2 pairs)
   TILE_SYMBOLS.winds.forEach((wind) => {
-    for (let i = 0; i < 4; i++) {
-      deck.push(wind);
-    }
+    addTilePairs(wind);
+    addTilePairs(wind);
   });
 
-  // Add dragons (4 copies each)
+  // Add dragons (3 copies each = 2 pairs)
   TILE_SYMBOLS.dragons.forEach((dragon) => {
-    for (let i = 0; i < 4; i++) {
-      deck.push(dragon);
-    }
+    addTilePairs(dragon);
+    addTilePairs(dragon);
   });
 
-  // Add seasons (4 copies each)
+  // Add seasons (2 copies each = 2 pairs)
   TILE_SYMBOLS.seasons.forEach((season) => {
-    for (let i = 0; i < 4; i++) {
-      deck.push(season);
-    }
-  });
-
-  // Add flowers (4 copies each)
-  TILE_SYMBOLS.flowers.forEach((flower) => {
-    for (let i = 0; i < 4; i++) {
-      deck.push(flower);
-    }
+    addTilePairs(season);
+    addTilePairs(season);
   });
 
   return shuffleArray(deck);
@@ -147,27 +139,64 @@ export const SPACING = {
 };
 
 export const CENTER_OFFSET = {
-  X: -8.4, // -(14 tiles * SPACING.X) / 2
-  Z: -5.6 // -(8 rows * SPACING.Z) / 2
+  X: -8.4,
+  Z: -5.6
 };
+
+function distributeLayerTiles(deck: string[], layerCount: number): string[][] {
+  const tilesNeededPerLayer = LAYER_LAYOUTS.map(
+    (layer) => layer.flat().filter((val) => val === 1 || val === 2 || val === 3).length
+  );
+
+  const totalSpacesNeeded = tilesNeededPerLayer.reduce((a, b) => a + b, 0);
+
+  if (deck.length < totalSpacesNeeded) {
+    while (deck.length < totalSpacesNeeded) {
+      deck = [...deck, ...deck];
+    }
+  }
+
+  const layerTiles: string[][] = [];
+  let deckIndex = 0;
+
+  for (let i = 0; i < layerCount; i++) {
+    layerTiles[i] = [];
+    const tilesNeeded = tilesNeededPerLayer[i];
+
+    for (let j = 0; j < tilesNeeded; j++) {
+      if (deckIndex < deck.length) {
+        layerTiles[i].push(deck[deckIndex]);
+        deckIndex++;
+      }
+    }
+  }
+
+  return layerTiles;
+}
 
 export function generateInitialLayout(): TileData[] {
   const tiles: TileData[] = [];
   let id = 0;
+
   const deck = generateTileDeck();
-  let deckIndex = 0;
+
+  const layerTiles = distributeLayerTiles(deck, LAYER_LAYOUTS.length);
+
+  const layerTileCounts = Array(LAYER_LAYOUTS.length).fill(0);
 
   LAYER_LAYOUTS.forEach((layer, layerIndex) => {
     layer.forEach((row, rowIndex) => {
       row.forEach((tileType, colIndex) => {
-        if (tileType === 1) {
+        if (tileType >= 1 && tileType <= 3) {
+          const tileSymbol = layerTiles[layerIndex][layerTileCounts[layerIndex]];
+
           tiles.push({
-            id: `${String(id++)}-${layerIndex}-${rowIndex}-${colIndex}`,
-            symbol: deck[deckIndex++],
+            id: `${String(id++)}-${layerIndex}-${rowIndex}-${colIndex}${tileType > 1 ? '-split' : ''}`,
+            symbol: tileSymbol,
             position: {
-              x: colIndex * SPACING.X + CENTER_OFFSET.X,
+              x: (tileType === 3 ? colIndex + 0.5 : colIndex) * SPACING.X + CENTER_OFFSET.X,
               y: layerIndex * SPACING.Y,
-              z: rowIndex * SPACING.Z + CENTER_OFFSET.Z
+              z: (tileType >= 2 ? rowIndex + 0.5 : rowIndex) * SPACING.Z + CENTER_OFFSET.Z
             },
             gridPosition: {
               x: colIndex,
@@ -178,46 +207,12 @@ export function generateInitialLayout(): TileData[] {
             isSelected: false,
             isRemoved: false
           });
-        } else if (tileType === 2) {
-          tiles.push({
-            id: `${String(id++)}-${layerIndex}-${rowIndex}-${colIndex}-split`,
-            symbol: deck[deckIndex++],
-            position: {
-              x: colIndex * SPACING.X + CENTER_OFFSET.X,
-              y: layerIndex * SPACING.Y,
-              z: (rowIndex + 0.5) * SPACING.Z + CENTER_OFFSET.Z
-            },
-            gridPosition: {
-              x: colIndex,
-              y: layerIndex,
-              z: rowIndex
-            },
-            layer: layerIndex,
-            isSelected: false,
-            isRemoved: false
-          });
-        } else if (tileType === 3) {
-          tiles.push({
-            id: `${String(id++)}-${layerIndex}-${rowIndex}-${colIndex}-split`,
-            symbol: deck[deckIndex++],
-            position: {
-              x: (colIndex + 0.5) * SPACING.X + CENTER_OFFSET.X,
-              y: layerIndex * SPACING.Y,
-              z: (rowIndex + 0.5) * SPACING.Z + CENTER_OFFSET.Z
-            },
-            gridPosition: {
-              x: colIndex,
-              y: layerIndex,
-              z: rowIndex
-            },
-            layer: layerIndex,
-            isSelected: false,
-            isRemoved: false
-          });
+
+          layerTileCounts[layerIndex]++;
         }
       });
     });
   });
 
-  return shuffleArray([...tiles, ...tiles]);
+  return tiles;
 }
