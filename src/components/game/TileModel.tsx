@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-/* eslint-disable react/no-unknown-property */
 import { TileData } from '@/utils/layoutGenerator';
 import { useGLTF, useTexture } from '@react-three/drei';
 import * as THREE from 'three';
@@ -18,8 +15,8 @@ export function TileModel({ props, tile }: { props?: any; tile: TileData }) {
   });
 
   return (
-    <group {...props} dispose={null}>
-      <group scale={[0.35, 1, 0.8]}>
+    <group {...props} dispose={null} rotation={[0, Math.PI, 0]}>
+      <group scale={[-0.35, 1, 0.8]}>
         <mesh
           castShadow
           receiveShadow
@@ -27,7 +24,6 @@ export function TileModel({ props, tile }: { props?: any; tile: TileData }) {
           material={sideMat}
         />
         <mesh
-          rotation={[0, Math.PI, 0]}
           castShadow
           receiveShadow
           geometry={(nodes.Cube001 as THREE.Mesh).geometry}
