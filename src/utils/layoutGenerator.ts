@@ -82,14 +82,11 @@ export const TILE_SYMBOLS = {
     sou: ['Sou1', 'Sou2', 'Sou3', 'Sou4', 'Sou5', 'Sou6', 'Sou7', 'Sou8', 'Sou9']
   },
   // Honors (4 copies each)
-  // TODO FIND WIND DESIGNS
-  winds: ['Nan', 'Pei', 'Ton'],
+  winds: ['North', 'South', 'East', 'West'],
   dragons: ['Chun', 'Haku', 'Hatsu'],
   // Bonus tiles (4 copies each)
-  // TODO find season designs
-  seasons: ['Shaa', 'Man5-Dora', 'Shaa', 'Man5-Dora'],
-  // TODO find flower designs
-  flowers: ['Pin5-Dora', 'Sou5-Dora', 'Pin5-Dora', 'Sou5-Dora']
+  seasons: ['Season1', 'Season2', 'Season3', 'Season4'],
+  flowers: ['Bamboo1', 'Bamboo2', 'Bamboo3', 'Bamboo4']
 };
 
 function generateTileDeck(): string[] {
