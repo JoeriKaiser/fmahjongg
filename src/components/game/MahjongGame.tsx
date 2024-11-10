@@ -121,6 +121,12 @@ export function MahjongGame() {
             rotation={[-0.3, -0.5, -0.2]}
           />
           <OrbitControls
+            mouseButtons={{
+              LEFT: undefined,
+              RIGHT: THREE.MOUSE.ROTATE,
+              MIDDLE: THREE.MOUSE.ROTATE
+            }}
+            enableDamping={true}
             enablePan={true}
             enableZoom={true}
             maxPolarAngle={Math.PI / 2}
@@ -174,7 +180,6 @@ export function MahjongGame() {
               </CardHeader>
               <CardContent>
                 <ul className="text-xs space-y-1">
-                  <li>🖱️ Left Click + Drag: Rotate camera</li>
                   <li>🖱️ Right Click + Drag: Pan camera</li>
                   <li>🖱️ Scroll Wheel: Zoom in/out</li>
                 </ul>
