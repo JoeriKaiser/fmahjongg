@@ -68,7 +68,7 @@ function createTileGrid(tiles: TileData[]) {
   return grid;
 }
 
-function getNeighbors(tile: TileData, grid: { [key: string]: TileData[] }) {
+export function getNeighbors(tile: TileData, grid: { [key: string]: TileData[] }) {
   const { x, y, z } = tile.gridPosition;
   return {
     top: Boolean(grid[`${x},${y + 1},${z}`]?.length),

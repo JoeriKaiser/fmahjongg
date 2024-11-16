@@ -1,3 +1,6 @@
+import { getNeighbors } from '@/store/gameStore';
+import { canMatch } from './gameLogic';
+
 export interface TileData {
   id: string;
   symbol: string;
@@ -83,23 +86,17 @@ export const TILE_SYMBOLS = {
   winds: ['North', 'South', 'East', 'West'],
   dragons: ['Chun', 'Haku', 'Hatsu'],
   seasons: ['Season1', 'Season2'],
-  flowers: ['Bamboo1', 'Bamboo2', 'Bamboo3', 'Bamboo4']
+  flowers: ['Bamboo1', 'Bamboo2']
 };
 
 function generateTileDeck(): string[] {
   const deck: string[] = [];
+  const tilesNeededPerLayer = LAYER_LAYOUTS.map(
+    (layer) => layer.flat().filter((val) => val === 1 || val === 2 || val === 3).length
+  );
+  const totalTilesNeeded = tilesNeededPerLayer.reduce((a, b) => a + b, 0);
 
-  const addTilePair = (tileType: string) => {
-    deck.push(tileType, tileType);
-  };
-
-  const totalSpaces = LAYER_LAYOUTS.reduce((total, layer) => {
-    return total + layer.flat().filter((val) => val === 1 || val === 2 || val === 3).length;
-  }, 0);
-
-  const neededPairs = totalSpaces / 2;
-
-  const allTiles = [
+  const tilePool = [
     ...TILE_SYMBOLS.suits.man,
     ...TILE_SYMBOLS.suits.pin,
     ...TILE_SYMBOLS.suits.sou,
@@ -109,9 +106,26 @@ function generateTileDeck(): string[] {
     ...TILE_SYMBOLS.flowers
   ];
 
-  for (let i = 0; i < neededPairs; i++) {
-    const randomTile = allTiles[Math.floor(Math.random() * allTiles.length)];
-    addTilePair(randomTile);
+  const shuffledPool = shuffleArray([...tilePool]);
+
+  const pairCounts = new Map<string, number>();
+
+  let poolIndex = 0;
+  while (deck.length < totalTilesNeeded) {
+    if (poolIndex >= shuffledPool.length) {
+      poolIndex = 0;
+      shuffleArray(shuffledPool);
+    }
+
+    const currentTile = shuffledPool[poolIndex];
+    const currentCount = pairCounts.get(currentTile) || 0;
+
+    if (currentCount < 2) {
+      deck.push(currentTile, currentTile);
+      pairCounts.set(currentTile, currentCount + 1);
+    }
+
+    poolIndex++;
   }
 
   return shuffleArray(deck);
@@ -182,11 +196,95 @@ function validateLayout(tiles: TileData[]): boolean {
   return true;
 }
 
+interface ValidationState {
+  tiles: TileData[];
+  removedTiles: Set<string>;
+  grid: { [key: string]: TileData[] };
+}
+
+function isLayoutSolvable(initialTiles: TileData[]): boolean {
+  const state: ValidationState = {
+    tiles: [...initialTiles],
+    removedTiles: new Set<string>(),
+    grid: createTileGrid(initialTiles)
+  };
+
+  while (true) {
+    const moves = findAvailableMoves(state);
+    if (moves.length === 0) {
+      return state.tiles.filter((t) => !state.removedTiles.has(t.id)).length === 0;
+    }
+
+    moves.sort((a, b) => {
+      if (a.tile1.layer !== b.tile1.layer) {
+        return b.tile1.layer - a.tile1.layer;
+      }
+      return a.tile1.gridPosition.z - b.tile1.gridPosition.z;
+    });
+
+    const move = moves[0];
+    state.removedTiles.add(move.tile1.id);
+    state.removedTiles.add(move.tile2.id);
+
+    state.grid = createTileGrid(state.tiles.filter((t) => !state.removedTiles.has(t.id)));
+  }
+}
+
+function findAvailableMoves(state: ValidationState): Array<{ tile1: TileData; tile2: TileData }> {
+  const moves: Array<{ tile1: TileData; tile2: TileData }> = [];
+  const activeTiles = state.tiles.filter((t) => !state.removedTiles.has(t.id));
+
+  const symbolMap = new Map<string, TileData[]>();
+  activeTiles.forEach((tile) => {
+    if (!symbolMap.has(tile.symbol)) {
+      symbolMap.set(tile.symbol, []);
+    }
+    symbolMap.get(tile.symbol)!.push(tile);
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  for (const [_, tiles] of symbolMap) {
+    if (tiles.length < 2) continue;
+
+    for (let i = 0; i < tiles.length; i++) {
+      for (let j = i + 1; j < tiles.length; j++) {
+        const tile1 = tiles[i];
+        const tile2 = tiles[j];
+
+        const tile1Neighbors = getNeighbors(tile1, state.grid);
+        const tile2Neighbors = getNeighbors(tile2, state.grid);
+
+        if (canMatch(tile1, tile2, tile1Neighbors, tile2Neighbors)) {
+          moves.push({ tile1, tile2 });
+        }
+      }
+    }
+  }
+
+  return moves;
+}
+
+function createTileGrid(tiles: TileData[]) {
+  const grid: { [key: string]: TileData[] } = {};
+
+  tiles.forEach((tile) => {
+    const { x, y, z } = tile.gridPosition;
+    const key = `${x},${y},${z}`;
+    grid[key] = grid[key] || [];
+    grid[key].push(tile);
+  });
+
+  return grid;
+}
+
 export function generateInitialLayout(): TileData[] {
   let tiles: TileData[] = [];
   let isValid = false;
+  let attempts = 0;
+  const MAX_ATTEMPTS = 50;
 
-  while (!isValid) {
+  while (!isValid && attempts < MAX_ATTEMPTS) {
+    attempts++;
     tiles = [];
     let id = 0;
 
@@ -201,7 +299,9 @@ export function generateInitialLayout(): TileData[] {
             const tileSymbol = layerTiles[layerIndex][layerTileCounts[layerIndex]];
 
             tiles.push({
-              id: `${String(id++)}-${layerIndex}-${rowIndex}-${colIndex}${tileType > 1 ? '-split' : ''}`,
+              id: `${String(id++)}-${layerIndex}-${rowIndex}-${colIndex}${
+                tileType > 1 ? '-split' : ''
+              }`,
               symbol: tileSymbol,
               position: {
                 x: (tileType === 3 ? colIndex + 0.5 : colIndex) * SPACING.X + CENTER_OFFSET.X,
@@ -224,7 +324,7 @@ export function generateInitialLayout(): TileData[] {
       });
     });
 
-    isValid = validateLayout(tiles);
+    isValid = validateLayout(tiles) && isLayoutSolvable(tiles);
   }
 
   return tiles;
