@@ -1,5 +1,8 @@
-import { canMatch } from '@/utils/gameLogic';
-import { CENTER_OFFSET, generateInitialLayout, SPACING, TileData } from '@/utils/layoutGenerator';
+import { canMatch } from '@/utils/mahjong/matching/matcher';
+import { generateInitialLayout } from '@/utils/mahjong/layout/generator';
+import { TileData } from '@/utils/mahjong/types';
+import { getNeighbors, createTileGrid } from '@/utils/mahjong/grid/gridUtils';
+import { findAvailableMoves } from '@/utils/mahjong/validation/moves';
 import * as zu from 'zustand';
 
 interface MatchingPair {
@@ -26,56 +29,6 @@ interface GameState {
   startTimer: () => void;
   stopTimer: () => void;
   isGameWon: boolean;
-}
-
-function createTileGrid(tiles: TileData[]) {
-  const grid: { [key: string]: TileData[] } = {};
-
-  tiles.forEach((tile) => {
-    if (!tile.isRemoved) {
-      if (tile.id.includes('split')) {
-        const { x, y, z } = tile.gridPosition;
-        const positions = [];
-
-        // Type 2 tiles (shifted down)
-        if (tile.position.x === x * SPACING.X + CENTER_OFFSET.X) {
-          positions.push(
-            `${x},${y},${z}`, // Base position
-            `${x},${y},${z + 1}` // Position below
-          );
-        }
-        // Type 3 tiles (shifted down and right)
-        else {
-          positions.push(
-            `${x},${y},${z}`, // Base position
-            `${x},${y},${z + 1}`, // Position below
-            `${x + 1},${y},${z}`, // Position right
-            `${x + 1},${y},${z + 1}` // Position diagonal
-          );
-        }
-
-        positions.forEach((key) => {
-          grid[key] = grid[key] || [];
-          grid[key].push(tile);
-        });
-      } else {
-        const key = `${tile.gridPosition.x},${tile.gridPosition.y},${tile.gridPosition.z}`;
-        grid[key] = grid[key] || [];
-        grid[key].push(tile);
-      }
-    }
-  });
-  return grid;
-}
-
-export function getNeighbors(tile: TileData, grid: { [key: string]: TileData[] }) {
-  const { x, y, z } = tile.gridPosition;
-  return {
-    top: Boolean(grid[`${x},${y + 1},${z}`]?.length),
-    left: Boolean(grid[`${x - 1},${y},${z}`]?.length),
-    right: Boolean(grid[`${x + 1},${y},${z}`]?.length),
-    splitAbove: grid[`${x},${y + 1},${z - 1}`]?.some((t) => t.id.includes('split')) ?? false
-  };
 }
 
 export const useGameStore = zu.create<GameState>((set, get) => ({
@@ -129,8 +82,7 @@ export const useGameStore = zu.create<GameState>((set, get) => ({
   setGameOver: (gameOver: boolean) =>
     set({
       gameOver,
-      // TODO FIX, this is not setting to true on finished game
-      isGameWon: gameOver && get().tiles.length === 0
+      isGameWon: gameOver && get().tiles.every((t) => t.isRemoved)
     }),
 
   resetGame: () => {
@@ -151,46 +103,30 @@ export const useGameStore = zu.create<GameState>((set, get) => ({
 
   getPossibleMoves: () => {
     const state = get();
-    const grid = createTileGrid(state.tiles);
-    const activeTiles = state.tiles.filter((tile) => !tile.isRemoved);
-    let possiblePairs = 0;
-    const counted = new Set<string>();
-    const matchingPairs: MatchingPair[] = [];
+    const validationState = {
+      tiles: state.tiles,
+      removedTiles: new Set(state.tiles.filter((t) => t.isRemoved).map((t) => t.id)),
+      grid: createTileGrid(state.tiles.filter((t) => !t.isRemoved))
+    };
 
-    for (let i = 0; i < activeTiles.length; i++) {
-      for (let j = i + 1; j < activeTiles.length; j++) {
-        const tile1 = activeTiles[i];
-        const tile2 = activeTiles[j];
-        const tile1Neighbors = getNeighbors(tile1, grid);
-        const tile2Neighbors = getNeighbors(tile2, grid);
+    const moves = findAvailableMoves(validationState);
+    const pairs = moves.map((move) => ({
+      tile1Id: move.tile1.id,
+      tile2Id: move.tile2.id
+    }));
 
-        if (
-          canMatch(tile1, tile2, tile1Neighbors, tile2Neighbors) &&
-          !counted.has(`${tile1.id}-${tile2.id}`) &&
-          !counted.has(`${tile2.id}-${tile1.id}`)
-        ) {
-          possiblePairs++;
-          counted.add(`${tile1.id}-${tile2.id}`);
-          matchingPairs.push({
-            tile1Id: tile1.id,
-            tile2Id: tile2.id
-          });
-        }
-      }
-    }
-
-    if (possiblePairs === 0 || activeTiles.length === 0) {
+    if (moves.length === 0 || state.tiles.every((t) => t.isRemoved)) {
       set((state) => ({ ...state, gameOver: true }));
       get().stopTimer();
     }
 
     set((state) => ({
       ...state,
-      possibleMoves: possiblePairs,
-      matchingPairs: matchingPairs
+      possibleMoves: moves.length,
+      matchingPairs: pairs
     }));
 
-    return { count: possiblePairs, pairs: matchingPairs };
+    return { count: moves.length, pairs };
   },
 
   startTimer: () => {
