@@ -1,9 +1,9 @@
 /* eslint-disable react/no-unknown-property */
-import { TileData } from '@/utils/layoutGenerator';
 import { useGameStore } from '@/store/gameStore';
 import { useRef } from 'react';
 import { TileModel } from './TileModel';
 import { ThreeEvent } from '@react-three/fiber';
+import { TileData } from '@/utils/mahjong/types';
 
 export function MahjongTile({ tile }: { tile: TileData }) {
   const selectTile = useGameStore((state) => state.selectTile);

@@ -1,9 +1,10 @@
+/* eslint-disable react/no-unknown-property */
 import { Canvas, useFrame } from '@react-three/fiber';
 import { useRef } from 'react';
 import { TileModel } from '../game/TileModel';
 import * as THREE from 'three';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
-import { TileData } from '@/utils/layoutGenerator';
+import { TileData } from '@/utils/mahjong/types';
 
 function SpinningTile() {
   const groupRef = useRef<THREE.Group>(null);
