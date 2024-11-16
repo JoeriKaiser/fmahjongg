@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unknown-property */
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { useGameStore } from '@/store/gameStore';
@@ -19,6 +20,9 @@ export function MahjongGame() {
   const getPossibleMoves = useGameStore((state) => state.getPossibleMoves);
   const isLoading = useGameStore((state) => state.isLoading);
   const gameOver = useGameStore((state) => state.gameOver);
+  const startTime = useGameStore((state) => state.startTime);
+  const elapsedTime = useGameStore((state) => state.elapsedTime);
+  const updateTimer = useGameStore((state) => state.updateTimer);
 
   useEffect(() => {
     if (cameraRef.current) {
@@ -32,6 +36,26 @@ export function MahjongGame() {
       getPossibleMoves();
     }
   }, [tiles, getPossibleMoves]);
+
+  useEffect(() => {
+    let intervalId: number;
+    if (startTime && !gameOver) {
+      intervalId = window.setInterval(() => {
+        updateTimer();
+      }, 1000);
+    }
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [startTime, gameOver, updateTimer]);
+
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
 
   if (isLoading) {
     return (
@@ -96,16 +120,21 @@ export function MahjongGame() {
             <CardTitle className="text-lg font-bold">Fast Mahjong</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center space-x-2">
-              <span className="text-sm">Remaining moves: {possibleMoves ?? 0}</span>
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm">Remaining moves: {possibleMoves ?? 0}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm">Time: {formatTime(elapsedTime)}</span>
+              </div>
+              <Button
+                variant="default"
+                className="mt-4 w-full bg-slate-700 hover:bg-slate-600"
+                onClick={resetGame}>
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Reset Game
+              </Button>
             </div>
-            <Button
-              variant="default"
-              className="mt-4 w-full bg-slate-700 hover:bg-slate-600"
-              onClick={resetGame}>
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Reset Game
-            </Button>
           </CardContent>
         </Card>
       </div>

@@ -2,18 +2,29 @@ import { canMatch } from '@/utils/gameLogic';
 import { CENTER_OFFSET, generateInitialLayout, SPACING, TileData } from '@/utils/layoutGenerator';
 import * as zu from 'zustand';
 
+interface MatchingPair {
+  tile1Id: string;
+  tile2Id: string;
+}
+
 interface GameState {
   tiles: TileData[];
   selectedTile: TileData | null;
   gameOver: boolean;
   setGameOver: (gameOver: boolean) => void;
   possibleMoves: number;
-  getPossibleMoves: () => number;
+  matchingPairs: MatchingPair[];
+  getPossibleMoves: () => { count: number; pairs: MatchingPair[] };
   selectTile: (tile: TileData) => void;
   removePair: (tile1: TileData, tile2: TileData) => void;
   resetGame: () => void;
   isLoading: boolean;
   setLoading: (loading: boolean) => void;
+  startTime: number | null;
+  elapsedTime: number;
+  updateTimer: () => void;
+  startTimer: () => void;
+  stopTimer: () => void;
 }
 
 function createTileGrid(tiles: TileData[]) {
@@ -72,6 +83,9 @@ export const useGameStore = zu.create<GameState>((set, get) => ({
   gameOver: false,
   possibleMoves: 0,
   isLoading: false,
+  matchingPairs: [],
+  startTime: null,
+  elapsedTime: 0,
 
   selectTile: (tile) =>
     set((state) => {
@@ -83,6 +97,10 @@ export const useGameStore = zu.create<GameState>((set, get) => ({
         const tile2Neighbors = getNeighbors(tile, grid);
 
         if (canMatch(state.selectedTile, tile, tile1Neighbors, tile2Neighbors)) {
+          if (!state.startTime && !state.gameOver) {
+            get().startTimer();
+          }
+
           return {
             selectedTile: null,
             tiles: clearedSelections.map((t) =>
@@ -109,7 +127,11 @@ export const useGameStore = zu.create<GameState>((set, get) => ({
   setGameOver: (gameOver: boolean) => set({ gameOver }),
 
   resetGame: () => {
-    set({ isLoading: true });
+    set({
+      isLoading: true,
+      startTime: null,
+      elapsedTime: 0
+    });
 
     setTimeout(() => {
       set({
@@ -126,6 +148,7 @@ export const useGameStore = zu.create<GameState>((set, get) => ({
     const activeTiles = state.tiles.filter((tile) => !tile.isRemoved);
     let possiblePairs = 0;
     const counted = new Set<string>();
+    const matchingPairs: MatchingPair[] = [];
 
     for (let i = 0; i < activeTiles.length; i++) {
       for (let j = i + 1; j < activeTiles.length; j++) {
@@ -141,15 +164,44 @@ export const useGameStore = zu.create<GameState>((set, get) => ({
         ) {
           possiblePairs++;
           counted.add(`${tile1.id}-${tile2.id}`);
+          matchingPairs.push({
+            tile1Id: tile1.id,
+            tile2Id: tile2.id
+          });
         }
       }
     }
 
-    if (possiblePairs === 0) {
+    if (possiblePairs === 0 || activeTiles.length === 0) {
       set((state) => ({ ...state, gameOver: true }));
+      get().stopTimer();
     }
 
-    set((state) => ({ ...state, possibleMoves: possiblePairs }));
-    return possiblePairs;
+    set((state) => ({
+      ...state,
+      possibleMoves: possiblePairs,
+      matchingPairs: matchingPairs
+    }));
+
+    return { count: possiblePairs, pairs: matchingPairs };
+  },
+
+  startTimer: () => {
+    set({ startTime: Date.now() });
+  },
+
+  stopTimer: () => {
+    if (get().startTime) {
+      set({
+        elapsedTime: Math.floor((Date.now() - get().startTime!) / 1000),
+        startTime: null
+      });
+    }
+  },
+
+  updateTimer: () => {
+    if (get().startTime) {
+      set({ elapsedTime: Math.floor((Date.now() - get().startTime!) / 1000) });
+    }
   }
 }));
