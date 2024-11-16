@@ -88,38 +88,31 @@ export const TILE_SYMBOLS = {
 
 function generateTileDeck(): string[] {
   const deck: string[] = [];
-  const tileCount: { [key: string]: number } = {};
 
-  const addTilePairs = (tileType: string) => {
-    deck.push(tileType, tileType); // Add pairs together
-    tileCount[tileType] = (tileCount[tileType] || 0) + 2;
+  const addTilePair = (tileType: string) => {
+    deck.push(tileType, tileType);
   };
 
-  // Add suits (4 copies each = 2 pairs)
-  Object.values(TILE_SYMBOLS.suits).forEach((suit) => {
-    suit.forEach((tile) => {
-      addTilePairs(tile);
-      addTilePairs(tile);
-    });
-  });
+  const totalSpaces = LAYER_LAYOUTS.reduce((total, layer) => {
+    return total + layer.flat().filter((val) => val === 1 || val === 2 || val === 3).length;
+  }, 0);
 
-  // Add winds (4 copies each = 2 pairs)
-  TILE_SYMBOLS.winds.forEach((wind) => {
-    addTilePairs(wind);
-    addTilePairs(wind);
-  });
+  const neededPairs = totalSpaces / 2;
 
-  // Add dragons (3 copies each = 2 pairs)
-  TILE_SYMBOLS.dragons.forEach((dragon) => {
-    addTilePairs(dragon);
-    addTilePairs(dragon);
-  });
+  const allTiles = [
+    ...TILE_SYMBOLS.suits.man,
+    ...TILE_SYMBOLS.suits.pin,
+    ...TILE_SYMBOLS.suits.sou,
+    ...TILE_SYMBOLS.winds,
+    ...TILE_SYMBOLS.dragons,
+    ...TILE_SYMBOLS.seasons,
+    ...TILE_SYMBOLS.flowers
+  ];
 
-  // Add seasons (2 copies each = 2 pairs)
-  TILE_SYMBOLS.seasons.forEach((season) => {
-    addTilePairs(season);
-    addTilePairs(season);
-  });
+  for (let i = 0; i < neededPairs; i++) {
+    const randomTile = allTiles[Math.floor(Math.random() * allTiles.length)];
+    addTilePair(randomTile);
+  }
 
   return shuffleArray(deck);
 }
@@ -148,71 +141,91 @@ function distributeLayerTiles(deck: string[], layerCount: number): string[][] {
     (layer) => layer.flat().filter((val) => val === 1 || val === 2 || val === 3).length
   );
 
-  const totalSpacesNeeded = tilesNeededPerLayer.reduce((a, b) => a + b, 0);
-
-  if (deck.length < totalSpacesNeeded) {
-    while (deck.length < totalSpacesNeeded) {
-      deck = [...deck, ...deck];
-    }
-  }
-
   const layerTiles: string[][] = [];
   let deckIndex = 0;
+
+  const totalSpacesNeeded = tilesNeededPerLayer.reduce((a, b) => a + b, 0);
+  if (deck.length !== totalSpacesNeeded) {
+    throw new Error(
+      `Deck size (${deck.length}) doesn't match required tiles (${totalSpacesNeeded})`
+    );
+  }
 
   for (let i = 0; i < layerCount; i++) {
     layerTiles[i] = [];
     const tilesNeeded = tilesNeededPerLayer[i];
 
     for (let j = 0; j < tilesNeeded; j++) {
-      if (deckIndex < deck.length) {
-        layerTiles[i].push(deck[deckIndex]);
-        deckIndex++;
-      }
+      layerTiles[i].push(deck[deckIndex]);
+      deckIndex++;
     }
   }
 
   return layerTiles;
 }
 
+function validateLayout(tiles: TileData[]): boolean {
+  const symbolCounts = new Map<string, number>();
+
+  tiles.forEach((tile) => {
+    const count = symbolCounts.get(tile.symbol) || 0;
+    symbolCounts.set(tile.symbol, count + 1);
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  for (const [_symbol, count] of symbolCounts) {
+    if (count % 2 !== 0) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export function generateInitialLayout(): TileData[] {
-  const tiles: TileData[] = [];
-  let id = 0;
+  let tiles: TileData[] = [];
+  let isValid = false;
 
-  const deck = generateTileDeck();
+  while (!isValid) {
+    tiles = [];
+    let id = 0;
 
-  const layerTiles = distributeLayerTiles(deck, LAYER_LAYOUTS.length);
+    const deck = generateTileDeck();
+    const layerTiles = distributeLayerTiles(deck, LAYER_LAYOUTS.length);
+    const layerTileCounts = Array(LAYER_LAYOUTS.length).fill(0);
 
-  const layerTileCounts = Array(LAYER_LAYOUTS.length).fill(0);
+    LAYER_LAYOUTS.forEach((layer, layerIndex) => {
+      layer.forEach((row, rowIndex) => {
+        row.forEach((tileType, colIndex) => {
+          if (tileType >= 1 && tileType <= 3) {
+            const tileSymbol = layerTiles[layerIndex][layerTileCounts[layerIndex]];
 
-  LAYER_LAYOUTS.forEach((layer, layerIndex) => {
-    layer.forEach((row, rowIndex) => {
-      row.forEach((tileType, colIndex) => {
-        if (tileType >= 1 && tileType <= 3) {
-          const tileSymbol = layerTiles[layerIndex][layerTileCounts[layerIndex]];
+            tiles.push({
+              id: `${String(id++)}-${layerIndex}-${rowIndex}-${colIndex}${tileType > 1 ? '-split' : ''}`,
+              symbol: tileSymbol,
+              position: {
+                x: (tileType === 3 ? colIndex + 0.5 : colIndex) * SPACING.X + CENTER_OFFSET.X,
+                y: layerIndex * SPACING.Y,
+                z: (tileType >= 2 ? rowIndex + 0.5 : rowIndex) * SPACING.Z + CENTER_OFFSET.Z
+              },
+              gridPosition: {
+                x: colIndex,
+                y: layerIndex,
+                z: rowIndex
+              },
+              layer: layerIndex,
+              isSelected: false,
+              isRemoved: false
+            });
 
-          tiles.push({
-            id: `${String(id++)}-${layerIndex}-${rowIndex}-${colIndex}${tileType > 1 ? '-split' : ''}`,
-            symbol: tileSymbol,
-            position: {
-              x: (tileType === 3 ? colIndex + 0.5 : colIndex) * SPACING.X + CENTER_OFFSET.X,
-              y: layerIndex * SPACING.Y,
-              z: (tileType >= 2 ? rowIndex + 0.5 : rowIndex) * SPACING.Z + CENTER_OFFSET.Z
-            },
-            gridPosition: {
-              x: colIndex,
-              y: layerIndex,
-              z: rowIndex
-            },
-            layer: layerIndex,
-            isSelected: false,
-            isRemoved: false
-          });
-
-          layerTileCounts[layerIndex]++;
-        }
+            layerTileCounts[layerIndex]++;
+          }
+        });
       });
     });
-  });
+
+    isValid = validateLayout(tiles);
+  }
 
   return tiles;
 }
