@@ -1,10 +1,14 @@
-import { TileData } from '@/utils/layoutGenerator';
+/* eslint-disable react/no-unknown-property */
+import { TileData } from '@/utils/mahjong/types';
 import { useGLTF, useTexture } from '@react-three/drei';
+import { GroupProps } from '@react-three/fiber';
 import * as THREE from 'three';
 
-export function TileModel({ props, tile }: { props?: any; tile: TileData }) {
+export function TileModel({ props, tile }: { props?: GroupProps; tile: TileData }) {
   const { nodes } = useGLTF('/textures/models/tile.glb');
-  const textures = useTexture({ symbol: `/textures/Regular/${tile.symbol}.png` });
+  const textures = tile.symbol
+    ? useTexture({ symbol: `/textures/Regular/${tile.symbol}.png` })
+    : useTexture({ symbol: `/textures/Regular/Chun.png` });
 
   const sideMat = new THREE.MeshStandardMaterial({
     color: tile.isSelected ? '#ffEeee' : '#ffffff'
