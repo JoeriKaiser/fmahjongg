@@ -9,9 +9,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, RotateCcw } from 'lucide-react';
 import * as THREE from 'three';
 import { SplashTile } from '../show/SplashTile';
+import { ScoreSubmission } from './ScoreSubmission';
+import { TopScores } from './TopScores';
 
 export function MahjongGame() {
   const [showControls, setShowControls] = useState(false);
+  const [showScoreSubmission, setShowScoreSubmission] = useState(false);
 
   const tiles = useGameStore((state) => state.tiles);
   const resetGame = useGameStore((state) => state.resetGame);
@@ -23,6 +26,7 @@ export function MahjongGame() {
   const startTime = useGameStore((state) => state.startTime);
   const elapsedTime = useGameStore((state) => state.elapsedTime);
   const updateTimer = useGameStore((state) => state.updateTimer);
+  const isGameWon = useGameStore((state) => state.isGameWon);
 
   useEffect(() => {
     if (cameraRef.current) {
@@ -76,12 +80,28 @@ export function MahjongGame() {
         id="main"
         className="h-screen w-screen bg-gradient-to-b from-slate-900 to-slate-800 flex items-center justify-center">
         <div className="text-white flex flex-col items-center gap-4">
-          <p className="text-lg">Game Over!</p>
+          <p className="text-lg">
+            {isGameWon ? "Congratulations! You've won!" : 'Game Over - No more possible moves!'}
+          </p>
           <Button variant="default" onClick={resetGame}>
             <RotateCcw className="mr-2 h-4 w-4" />
             Restart
           </Button>
+          {isGameWon && !showScoreSubmission && (
+            <Button variant="default" onClick={() => setShowScoreSubmission(true)}>
+              Submit Score
+            </Button>
+          )}
         </div>
+        {showScoreSubmission && isGameWon && (
+          <ScoreSubmission
+            time={elapsedTime}
+            onScoreSubmitted={() => {
+              setShowScoreSubmission(false);
+              resetGame();
+            }}
+          />
+        )}
       </div>
     );
   }
@@ -138,7 +158,7 @@ export function MahjongGame() {
           </CardContent>
         </Card>
       </div>
-
+      <TopScores />
       <div className="h-full w-full">
         <Canvas shadows className="h-full w-full">
           <PerspectiveCamera

@@ -25,6 +25,7 @@ interface GameState {
   updateTimer: () => void;
   startTimer: () => void;
   stopTimer: () => void;
+  isGameWon: boolean;
 }
 
 function createTileGrid(tiles: TileData[]) {
@@ -86,6 +87,7 @@ export const useGameStore = zu.create<GameState>((set, get) => ({
   matchingPairs: [],
   startTime: null,
   elapsedTime: 0,
+  isGameWon: false,
 
   selectTile: (tile) =>
     set((state) => {
@@ -124,7 +126,12 @@ export const useGameStore = zu.create<GameState>((set, get) => ({
     })),
 
   setLoading: (loading: boolean) => set({ isLoading: loading }),
-  setGameOver: (gameOver: boolean) => set({ gameOver }),
+  setGameOver: (gameOver: boolean) =>
+    set({
+      gameOver,
+      // TODO FIX, this is not setting to true on finished game
+      isGameWon: gameOver && get().tiles.length === 0
+    }),
 
   resetGame: () => {
     set({
