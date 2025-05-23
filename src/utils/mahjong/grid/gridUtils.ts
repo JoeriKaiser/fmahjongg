@@ -1,24 +1,45 @@
-import { TileData, TileNeighbors } from '../types';
+import type { TileData, TileNeighbors } from "../types";
 
-export function createTileGrid(tiles: TileData[]) {
-  const grid: { [key: string]: TileData[] } = {};
+export function createTileGrid(tiles: TileData[]): {
+	[key: string]: TileData[];
+} {
+	const grid: {
+		[key: string]: TileData[];
+	} = tiles.reduce<{
+		[key: string]: TileData[];
+	}>((acc, tile) => {
+		const { x, y, z } = tile.gridPosition;
+		const key = `${x},${y},${z}`;
 
-  tiles.forEach((tile) => {
-    const { x, y, z } = tile.gridPosition;
-    const key = `${x},${y},${z}`;
-    grid[key] = grid[key] || [];
-    grid[key].push(tile);
-  });
+		if (!acc[key]) {
+			acc[key] = [];
+		}
+		acc[key].push(tile);
 
-  return grid;
+		return acc;
+	}, {});
+
+	return grid;
 }
 
-export function getNeighbors(tile: TileData, grid: { [key: string]: TileData[] }): TileNeighbors {
-  const { x, y, z } = tile.gridPosition;
-  return {
-    top: Boolean(grid[`${x},${y + 1},${z}`]?.length),
-    left: Boolean(grid[`${x - 1},${y},${z}`]?.length),
-    right: Boolean(grid[`${x + 1},${y},${z}`]?.length),
-    splitAbove: grid[`${x},${y + 1},${z - 1}`]?.some((t) => t.id.includes('split')) ?? false
-  };
+export function getNeighbors(
+	tile: TileData,
+	grid: { [key: string]: TileData[] },
+): TileNeighbors {
+	const { x, y, z } = tile.gridPosition;
+
+	const hasTop = Boolean(grid[`${x},${y + 1},${z}`]?.length);
+	const hasLeft = Boolean(grid[`${x - 1},${y},${z}`]?.length);
+	const hasRight = Boolean(grid[`${x + 1},${y},${z}`]?.length);
+
+	const hasSplitAbove = Boolean(
+		grid[`${x},${y + 1},${z - 1}`]?.some((t) => t.id.includes("split")),
+	);
+
+	return {
+		top: hasTop,
+		left: hasLeft,
+		right: hasRight,
+		splitAbove: hasSplitAbove,
+	};
 }

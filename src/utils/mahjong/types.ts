@@ -14,6 +14,7 @@ export interface TileData {
   layer: number;
   isSelected: boolean;
   isRemoved: boolean;
+  isAccessible: boolean;
 }
 
 export interface ValidationState {

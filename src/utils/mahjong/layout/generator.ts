@@ -1,128 +1,141 @@
-import { TileData } from '../types';
-import { TILE_SYMBOLS, SPACING, CENTER_OFFSET, MAX_GENERATION_ATTEMPTS } from '../constants';
-import { LAYER_LAYOUTS } from './layouts';
-import { validateLayout } from '../validation/validator';
-import { isLayoutSolvable } from '../validation/solvability';
+import {
+	CENTER_OFFSET,
+	MAX_GENERATION_ATTEMPTS,
+	SPACING,
+	TILE_SYMBOLS,
+} from "../constants";
+import type { TileData } from "../types";
+import { isLayoutSolvable } from "../validation/solvability";
+import { validateLayout } from "../validation/validator";
+import { LAYER_LAYOUTS } from "./layouts";
 
 function shuffleArray<T>(array: T[]): T[] {
-  const newArray = [...array];
-  for (let i = newArray.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-  }
-  return newArray;
+	const result = [...array];
+	for (let i = result.length - 1; i > 0; i--) {
+		const j = Math.floor(Math.random() * (i + 1));
+		[result[i], result[j]] = [result[j], result[i]];
+	}
+	return result;
+}
+
+function createTileSymbolPool(): string[] {
+	return [
+		...TILE_SYMBOLS.suits.man,
+		...TILE_SYMBOLS.suits.pin,
+		...TILE_SYMBOLS.suits.sou,
+		...TILE_SYMBOLS.winds,
+		...TILE_SYMBOLS.dragons,
+		...TILE_SYMBOLS.seasons,
+		...TILE_SYMBOLS.flowers,
+	];
 }
 
 function generateTileDeck(): string[] {
-  const deck: string[] = [];
-  const tilesNeededPerLayer = LAYER_LAYOUTS.map(
-    (layer) => layer.flat().filter((val) => val === 1 || val === 2 || val === 3).length
-  );
-  const totalTilesNeeded = tilesNeededPerLayer.reduce((a, b) => a + b, 0);
+	const totalTilesNeeded = LAYER_LAYOUTS.reduce(
+		(total, layer) =>
+			total + layer.flat().filter((val) => val >= 1 && val <= 3).length,
+		0,
+	);
 
-  const tilePool = [
-    ...TILE_SYMBOLS.suits.man,
-    ...TILE_SYMBOLS.suits.pin,
-    ...TILE_SYMBOLS.suits.sou,
-    ...TILE_SYMBOLS.winds,
-    ...TILE_SYMBOLS.dragons,
-    ...TILE_SYMBOLS.seasons,
-    ...TILE_SYMBOLS.flowers
-  ];
+	const symbolPool = createTileSymbolPool();
+	const deck: string[] = [];
+	const symbolUsage = new Map<string, number>();
 
-  const shuffledPool = shuffleArray([...tilePool]);
-  const pairCounts = new Map<string, number>();
+	const shuffledPool = shuffleArray(symbolPool);
+	let poolIndex = 0;
 
-  let poolIndex = 0;
-  while (deck.length < totalTilesNeeded) {
-    if (poolIndex >= shuffledPool.length) {
-      poolIndex = 0;
-      shuffleArray(shuffledPool);
-    }
+	while (deck.length < totalTilesNeeded) {
+		const symbol = shuffledPool[poolIndex % shuffledPool.length];
+		const currentUsage = symbolUsage.get(symbol) || 0;
 
-    const currentTile = shuffledPool[poolIndex];
-    const currentCount = pairCounts.get(currentTile) || 0;
+		if (currentUsage === 0) {
+			deck.push(symbol, symbol);
+			symbolUsage.set(symbol, 2);
+		} else if (currentUsage % 2 === 0 && deck.length + 2 <= totalTilesNeeded) {
+			deck.push(symbol, symbol);
+			symbolUsage.set(symbol, currentUsage + 2);
+		}
 
-    if (currentCount < 2) {
-      deck.push(currentTile, currentTile);
-      pairCounts.set(currentTile, currentCount + 1);
-    }
+		poolIndex++;
 
-    poolIndex++;
-  }
+		if (poolIndex >= shuffledPool.length * 10) {
+			break;
+		}
+	}
 
-  return shuffleArray(deck);
+	while (deck.length < totalTilesNeeded) {
+		const symbol =
+			shuffledPool[Math.floor(Math.random() * shuffledPool.length)];
+		deck.push(symbol);
+	}
+
+	return shuffleArray(deck.slice(0, totalTilesNeeded));
 }
 
-function distributeLayerTiles(deck: string[], layerCount: number): string[][] {
-  const tilesNeededPerLayer = LAYER_LAYOUTS.map(
-    (layer) => layer.flat().filter((val) => val === 1 || val === 2 || val === 3).length
-  );
+function createTilesFromLayout(deck: string[]): TileData[] {
+	const tiles: TileData[] = [];
+	let deckIndex = 0;
+	let tileId = 0;
 
-  const layerTiles: string[][] = [];
-  let deckIndex = 0;
+	LAYER_LAYOUTS.forEach((layer, layerIndex) => {
+		layer.forEach((row, rowIndex) => {
+			row.forEach((tileType, colIndex) => {
+				if (tileType >= 1 && tileType <= 3) {
+					const symbol = deck[deckIndex];
 
-  for (let i = 0; i < layerCount; i++) {
-    layerTiles[i] = [];
-    const tilesNeeded = tilesNeededPerLayer[i];
+					tiles.push({
+						id: `${tileId++}-${layerIndex}-${rowIndex}-${colIndex}${
+							tileType > 1 ? "-split" : ""
+						}`,
+						symbol,
+						position: {
+							x:
+								(tileType === 3 ? colIndex + 0.5 : colIndex) * SPACING.X +
+								CENTER_OFFSET.X,
+							y: layerIndex * SPACING.Y,
+							z:
+								(tileType >= 2 ? rowIndex + 0.5 : rowIndex) * SPACING.Z +
+								CENTER_OFFSET.Z,
+						},
+						gridPosition: {
+							x: colIndex,
+							y: layerIndex,
+							z: rowIndex,
+						},
+						layer: layerIndex,
+						isSelected: false,
+						isRemoved: false,
+						isAccessible: true,
+					});
 
-    for (let j = 0; j < tilesNeeded; j++) {
-      layerTiles[i].push(deck[deckIndex]);
-      deckIndex++;
-    }
-  }
+					deckIndex++;
+				}
+			});
+		});
+	});
 
-  return layerTiles;
+	return tiles;
 }
 
 export function generateInitialLayout(): TileData[] {
-  let tiles: TileData[] = [];
-  let isValid = false;
-  let attempts = 0;
+	let attempts = 0;
 
-  while (!isValid && attempts < MAX_GENERATION_ATTEMPTS) {
-    attempts++;
-    tiles = [];
-    let id = 0;
+	while (attempts < MAX_GENERATION_ATTEMPTS) {
+		attempts++;
 
-    const deck = generateTileDeck();
-    const layerTiles = distributeLayerTiles(deck, LAYER_LAYOUTS.length);
-    const layerTileCounts = Array(LAYER_LAYOUTS.length).fill(0);
+		try {
+			const deck = generateTileDeck();
+			const tiles = createTilesFromLayout(deck);
 
-    LAYER_LAYOUTS.forEach((layer, layerIndex) => {
-      layer.forEach((row, rowIndex) => {
-        row.forEach((tileType, colIndex) => {
-          if (tileType >= 1 && tileType <= 3) {
-            const tileSymbol = layerTiles[layerIndex][layerTileCounts[layerIndex]];
+			if (validateLayout(tiles) && isLayoutSolvable(tiles)) {
+				return tiles;
+			}
+		} catch (error) {
+			console.warn(`Layout generation attempt ${attempts} failed:`, error);
+		}
+	}
 
-            tiles.push({
-              id: `${String(id++)}-${layerIndex}-${rowIndex}-${colIndex}${
-                tileType > 1 ? '-split' : ''
-              }`,
-              symbol: tileSymbol,
-              position: {
-                x: (tileType === 3 ? colIndex + 0.5 : colIndex) * SPACING.X + CENTER_OFFSET.X,
-                y: layerIndex * SPACING.Y,
-                z: (tileType >= 2 ? rowIndex + 0.5 : rowIndex) * SPACING.Z + CENTER_OFFSET.Z
-              },
-              gridPosition: {
-                x: colIndex,
-                y: layerIndex,
-                z: rowIndex
-              },
-              layer: layerIndex,
-              isSelected: false,
-              isRemoved: false
-            });
-
-            layerTileCounts[layerIndex]++;
-          }
-        });
-      });
-    });
-
-    isValid = validateLayout(tiles) && isLayoutSolvable(tiles);
-  }
-
-  return tiles;
+	console.warn("Could not generate perfectly solvable layout, using fallback");
+	const deck = generateTileDeck();
+	return createTilesFromLayout(deck);
 }
