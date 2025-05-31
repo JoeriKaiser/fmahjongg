@@ -1,10 +1,10 @@
+import type { TileData } from "@/utils/mahjong/types";
+import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
 /* eslint-disable react/no-unknown-property */
-import { Canvas, useFrame } from '@react-three/fiber';
-import { useRef } from 'react';
-import { TileModel } from '../game/TileModel';
-import * as THREE from 'three';
-import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
-import { TileData } from '@/utils/mahjong/types';
+import { Canvas, useFrame } from "@react-three/fiber";
+import { useRef } from "react";
+import type * as THREE from "three";
+import { TileModel } from "../game/TileModel";
 
 function SpinningTile() {
   const groupRef = useRef<THREE.Group>(null);
@@ -16,13 +16,14 @@ function SpinningTile() {
   });
 
   const dummyTile: TileData = {
-    id: 'splash',
+    id: "splash",
     gridPosition: { x: 0, y: 0, z: 0 },
-    symbol: 'Chun',
+    symbol: "Chun",
     layer: 0,
     position: { x: 0, y: 0, z: 0 },
     isRemoved: false,
-    isSelected: false
+    isSelected: false,
+    isAccessible: true,
   };
 
   return (
@@ -41,7 +42,11 @@ export function SplashTile() {
         <directionalLight position={[-10, 10, -5]} intensity={0.4} />
 
         <PerspectiveCamera makeDefault position={[0, 2, 5]} />
-        <OrbitControls enablePan={false} enableZoom={false} enableRotate={false} />
+        <OrbitControls
+          enablePan={false}
+          enableZoom={false}
+          enableRotate={false}
+        />
 
         <group position={[0, 0, 0]}>
           <SpinningTile />

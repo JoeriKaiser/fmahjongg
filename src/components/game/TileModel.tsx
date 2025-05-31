@@ -2,12 +2,14 @@
 import type { TileData } from "@/utils/mahjong/types";
 import { Outlines, useGLTF, useTexture } from "@react-three/drei";
 import type { GroupProps } from "@react-three/fiber";
+import React from "react";
 import * as THREE from "three";
 
 export function TileModel({
   props,
   tile,
 }: { props?: GroupProps; tile: TileData }) {
+  const [hovered, hover] = React.useState(false)
   const { nodes } = useGLTF("/textures/models/tile.glb");
   const textures = tile.symbol
     ? useTexture({ symbol: `/textures/Regular/${tile.symbol}.png` })
@@ -15,6 +17,8 @@ export function TileModel({
 
   const sideMat = new THREE.MeshStandardMaterial({
     color: tile.isSelected ? "#ffEeee" : "#ffffff",
+    emissive: "#ffffff",
+    emissiveIntensity: hovered ? 0.25 : 0,
   });
 
   const topMat = new THREE.MeshStandardMaterial({
@@ -29,7 +33,9 @@ export function TileModel({
 
   return (
     <group {...props} dispose={null} rotation={[0, Math.PI, 0]}>
-      <group scale={[-0.35, 1, 0.8]}>
+      {/* biome-ignore lint/style/noCommaOperator: <explanation> */}
+      <group scale={[-0.35, 1, 0.8]} onPointerOver={(event) => (event.stopPropagation(), hover(true))}
+        onPointerOut={() => hover(false)}>
         <mesh
           castShadow
           receiveShadow

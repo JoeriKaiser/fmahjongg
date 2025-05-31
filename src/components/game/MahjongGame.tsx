@@ -2,7 +2,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useGameStore } from "@/store/gameStore";
 import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
-/* eslint-disable react/no-unknown-property */
 import { Canvas } from "@react-three/fiber";
 import { Loader2, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
