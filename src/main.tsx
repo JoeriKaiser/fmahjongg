@@ -1,4 +1,4 @@
-import { Analytics } from "@vercel/analytics/next";
+import { Analytics } from "@vercel/analytics/react";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { RouterProvider, createBrowserRouter } from "react-router-dom";
@@ -14,8 +14,8 @@ const router = createBrowserRouter([
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
+    <Analytics />
     <Layout>
-      <Analytics />
       <RouterProvider router={router} />
     </Layout>
   </React.StrictMode>,
