@@ -1,60 +1,99 @@
-import { useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { invoke } from "@tauri-apps/api/core";
+import { Loader2 } from "lucide-react";
+import { memo, useCallback, useId, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 
 interface ScoreSubmissionProps {
-  time: number;
-  onScoreSubmitted: () => void;
+	time: number;
+	onScoreSubmitted: () => void;
 }
 
-export const ScoreSubmission = ({ time, onScoreSubmitted }: ScoreSubmissionProps) => {
-  const [name, setName] = useState<string>('');
+export const ScoreSubmission = memo(function ScoreSubmission({
+	time,
+	onScoreSubmitted,
+}: ScoreSubmissionProps) {
+	const [name, setName] = useState("");
+	const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const saveScore = async () => {
-    if (!name.trim()) return;
+	const formatTime = (seconds: number) => {
+		const mins = Math.floor(seconds / 60);
+		const secs = seconds % 60;
+		return `${mins}:${secs.toString().padStart(2, "0")}`;
+	};
 
-    try {
-      onScoreSubmitted();
-      await invoke('add_score', { name: name.trim(), time });
-    } catch (error) {
-      console.error(error);
-    }
-  };
+	const saveScore = useCallback(async () => {
+		const trimmedName = name.trim();
+		if (!trimmedName || isSubmitting) return;
 
-  return (
-    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-      <Card className="w-96 bg-slate-800 text-white">
-        <CardHeader>
-          <CardTitle>Submit Your Score</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <label htmlFor="name" className="text-sm">
-              Enter your name:
-            </label>
-            <Input
-              id="name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your name"
-              className="bg-slate-700 border-slate-600"
-              maxLength={20}
-            />
-          </div>
-          <div className="text-sm">
-            Your time: {Math.floor(time / 60)}:{(time % 60).toString().padStart(2, '0')}
-          </div>
-          <Button
-            onClick={saveScore}
-            disabled={!name.trim()}
-            className="w-full bg-slate-700 hover:bg-slate-600">
-            Submit Score
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
+		setIsSubmitting(true);
+		try {
+			await invoke("add_score", { name: trimmedName, time });
+			onScoreSubmitted();
+		} catch (error) {
+			console.error("Failed to save score:", error);
+			setIsSubmitting(false);
+		}
+	}, [name, time, onScoreSubmitted, isSubmitting]);
+
+	const handleKeyDown = useCallback(
+		(e: React.KeyboardEvent) => {
+			if (e.key === "Enter") {
+				saveScore();
+			}
+		},
+		[saveScore],
+	);
+
+	return (
+		<div className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-50 animate-in fade-in duration-200">
+			<Card className="w-96 bg-slate-800 text-white border-slate-700 animate-in zoom-in-95 duration-200">
+				<CardHeader>
+					<CardTitle className="text-xl">🏆 Submit Your Score</CardTitle>
+				</CardHeader>
+				<CardContent className="space-y-4">
+					<div className="text-center py-4">
+						<div className="text-4xl font-mono font-bold text-emerald-400">
+							{formatTime(time)}
+						</div>
+						<div className="text-sm text-slate-400 mt-1">Completion Time</div>
+					</div>
+
+					<div className="space-y-2">
+						<label htmlFor="name" className="text-sm text-slate-300">
+							Enter your name:
+						</label>
+						<Input
+							id={useId()}
+							type="text"
+							value={name}
+							onChange={(e) => setName(e.target.value)}
+							onKeyDown={handleKeyDown}
+							placeholder="Your name"
+							className="bg-slate-700 border-slate-600 focus:border-emerald-500 transition-colors"
+							maxLength={20}
+							autoFocus
+							disabled={isSubmitting}
+						/>
+					</div>
+
+					<Button
+						onClick={saveScore}
+						disabled={!name.trim() || isSubmitting}
+						className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-600 transition-colors"
+					>
+						{isSubmitting ? (
+							<>
+								<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+								Submitting...
+							</>
+						) : (
+							"Submit Score"
+						)}
+					</Button>
+				</CardContent>
+			</Card>
+		</div>
+	);
+});

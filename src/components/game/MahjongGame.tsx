@@ -1,234 +1,330 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useGameStore } from "@/store/gameStore";
 import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import { Loader2, RotateCcw } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useGameStore } from "@/store/gameStore";
 import { SplashTile } from "../show/SplashTile";
-import { MahjongTile } from "./MahjongTile";
 import { ScoreSubmission } from "./ScoreSubmission";
+import { TileInstances } from "./TileInstances";
 import { TopScores } from "./TopScores";
 
+const GameInfoPanel = memo(function GameInfoPanel({
+	possibleMoves,
+	elapsedTime,
+	onReset,
+}: {
+	possibleMoves: number;
+	elapsedTime: number;
+	onReset: () => void;
+}) {
+	const formatTime = (seconds: number) => {
+		const mins = Math.floor(seconds / 60);
+		const secs = seconds % 60;
+		return `${mins}:${secs.toString().padStart(2, "0")}`;
+	};
+
+	return (
+		<Card className="w-64 bg-slate-800/90 text-white shadow-xl backdrop-blur-sm">
+			<CardHeader className="pb-2">
+				<CardTitle className="text-lg font-bold">Fast Mahjong</CardTitle>
+			</CardHeader>
+			<CardContent>
+				<div className="space-y-2">
+					<div className="flex justify-between text-sm">
+						<span>Moves available:</span>
+						<span className="font-mono">{possibleMoves}</span>
+					</div>
+					<div className="flex justify-between text-sm">
+						<span>Time:</span>
+						<span className="font-mono">{formatTime(elapsedTime)}</span>
+					</div>
+					<Button
+						variant="default"
+						className="mt-4 w-full bg-slate-700 hover:bg-slate-600 transition-colors"
+						onClick={onReset}
+					>
+						<RotateCcw className="mr-2 h-4 w-4" />
+						Reset Game
+					</Button>
+				</div>
+			</CardContent>
+		</Card>
+	);
+});
+
+const ControlsHelp = memo(function ControlsHelp() {
+	const [show, setShow] = useState(false);
+
+	return (
+		<div className="relative">
+			<Button
+				variant="default"
+				size="sm"
+				className="bg-slate-800/90 hover:bg-slate-700/90 backdrop-blur-sm"
+				onClick={() => setShow(!show)}
+			>
+				<span className="text-sm">🎮</span>
+			</Button>
+
+			{show && (
+				<Card className="absolute bottom-12 right-0 w-64 bg-slate-800/90 text-white shadow-xl backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2 duration-200">
+					<CardHeader className="pb-2">
+						<CardTitle className="text-sm font-bold">Controls</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<ul className="text-xs space-y-1">
+							<li>🖱️ Left Click: Select tile</li>
+							<li>🖱️ Right Click + Drag: Rotate camera</li>
+							<li>🖱️ Scroll: Zoom in/out</li>
+						</ul>
+					</CardContent>
+				</Card>
+			)}
+		</div>
+	);
+});
+
+const LoadingScreen = memo(function LoadingScreen() {
+	return (
+		<div className="h-screen w-screen bg-gradient-to-b from-slate-900 to-slate-800 flex items-center justify-center">
+			<div className="text-white flex flex-col items-center gap-4">
+				<div className="relative">
+					<Loader2 className="h-12 w-12 animate-spin text-emerald-400" />
+					<div className="absolute inset-0 h-12 w-12 animate-ping opacity-20 rounded-full bg-emerald-400" />
+				</div>
+				<p className="text-lg text-slate-300 animate-pulse">
+					Generating puzzle...
+				</p>
+			</div>
+		</div>
+	);
+});
+
+const WelcomeScreen = memo(function WelcomeScreen({
+	onStart,
+}: {
+	onStart: () => void;
+}) {
+	return (
+		<div className="h-screen w-screen bg-gradient-to-b from-slate-900 to-slate-800">
+			<div className="h-full w-full flex flex-col items-center justify-center">
+				<div className="text-white flex flex-col items-center gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+					<h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+						Welcome to Fast Mahjong
+					</h1>
+					<p className="text-lg text-slate-300 tracking-wide">
+						Experience the classic game reimagined
+					</p>
+				</div>
+				<div className="w-64 h-64 animate-in fade-in duration-700 delay-200">
+					<SplashTile />
+				</div>
+				<Button
+					variant="default"
+					className="mt-8 bg-emerald-600 hover:bg-emerald-500 transition-all hover:scale-105 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300"
+					onClick={onStart}
+				>
+					Start Game
+				</Button>
+			</div>
+		</div>
+	);
+});
+
+const GameOverScreen = memo(function GameOverScreen({
+	isWon,
+	onReset,
+	onSubmitScore,
+}: {
+	isWon: boolean;
+	elapsedTime: number;
+	onReset: () => void;
+	onSubmitScore: () => void;
+}) {
+	return (
+		<div className="h-screen w-screen bg-gradient-to-b from-slate-900 to-slate-800 flex items-center justify-center">
+			<div className="text-white flex flex-col items-center gap-6 animate-in fade-in zoom-in-95 duration-300">
+				<div className={`text-6xl ${isWon ? "animate-bounce" : ""}`}>
+					{isWon ? "🎉" : "😔"}
+				</div>
+				<p className="text-2xl font-bold">
+					{isWon ? "Congratulations!" : "Game Over"}
+				</p>
+				<p className="text-slate-300">
+					{isWon ? "You've cleared all tiles!" : "No more moves available"}
+				</p>
+				<div className="flex gap-4 mt-4">
+					<Button
+						variant="default"
+						className="bg-slate-700 hover:bg-slate-600 transition-colors"
+						onClick={onReset}
+					>
+						<RotateCcw className="mr-2 h-4 w-4" />
+						Play Again
+					</Button>
+					{isWon && (
+						<Button
+							variant="default"
+							className="bg-emerald-600 hover:bg-emerald-500 transition-colors"
+							onClick={onSubmitScore}
+						>
+							Submit Score
+						</Button>
+					)}
+				</div>
+			</div>
+		</div>
+	);
+});
+
+const GameScene = memo(function GameScene() {
+	const cameraRef = useRef<THREE.PerspectiveCamera>(null);
+
+	useEffect(() => {
+		if (cameraRef.current) {
+			cameraRef.current.position.set(0, 15, 20);
+			cameraRef.current.lookAt(0, 0, 0);
+		}
+	}, []);
+
+	return (
+		<>
+			<PerspectiveCamera
+				ref={cameraRef}
+				makeDefault
+				fov={75}
+				near={0.1}
+				far={1000}
+				rotation={[-0.3, -0.3, -0.2]}
+			/>
+			<OrbitControls
+				mouseButtons={{
+					LEFT: undefined,
+					RIGHT: THREE.MOUSE.ROTATE,
+					MIDDLE: THREE.MOUSE.ROTATE,
+				}}
+				enableDamping
+				dampingFactor={0.05}
+				enablePan
+				enableZoom
+				maxPolarAngle={Math.PI / 2}
+				minPolarAngle={Math.PI / 12}
+				minDistance={10}
+				maxDistance={30}
+				target={[0, 0, 0]}
+			/>
+
+			<ambientLight intensity={0.5} />
+			<directionalLight
+				position={[15, 15, 5]}
+				intensity={0.8}
+				castShadow
+				shadow-mapSize-width={1024}
+				shadow-mapSize-height={1024}
+				shadow-camera-far={50}
+				shadow-camera-left={-20}
+				shadow-camera-right={20}
+				shadow-camera-top={20}
+				shadow-camera-bottom={-20}
+			/>
+			<directionalLight position={[-10, 12, -5]} intensity={0.3} />
+
+			<TileInstances />
+
+			<mesh
+				rotation={[-Math.PI / 2, 0, 0]}
+				position={[0, -0.5, 0]}
+				receiveShadow
+			>
+				<planeGeometry args={[100, 100]} />
+				<meshStandardMaterial color="#3a4a5a" roughness={0.9} metalness={0.1} />
+			</mesh>
+		</>
+	);
+});
+
 export function MahjongGame() {
-  const [showControls, setShowControls] = useState(false);
-  const [showScoreSubmission, setShowScoreSubmission] = useState(false);
+	const [showScoreSubmission, setShowScoreSubmission] = useState(false);
 
-  const {
-    tiles,
-    resetGame,
-    possibleMoves,
-    isLoading,
-    gameOver,
-    elapsedTime,
-    isGameWon,
-  } = useGameStore();
+	const tiles = useGameStore((s) => s.tiles);
+	const isLoading = useGameStore((s) => s.isLoading);
+	const gameOver = useGameStore((s) => s.gameOver);
+	const isGameWon = useGameStore((s) => s.isGameWon);
+	const elapsedTime = useGameStore((s) => s.elapsedTime);
+	const possibleMoves = useGameStore((s) => s.possibleMoves);
+	const resetGame = useGameStore((s) => s.resetGame);
 
-  const cameraRef = useRef<THREE.PerspectiveCamera>(null);
+	const handleScoreSubmitted = useCallback(() => {
+		setShowScoreSubmission(false);
+		resetGame();
+	}, [resetGame]);
 
-  const formatTime = useCallback((seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
-  }, []);
+	const handleSubmitScore = useCallback(() => {
+		setShowScoreSubmission(true);
+	}, []);
 
-  useEffect(() => {
-    if (cameraRef.current) {
-      cameraRef.current.position.set(0, 15, 20);
-      cameraRef.current.lookAt(0, 0, 0);
-    }
-  }, []);
+	// Render states
+	if (isLoading) {
+		return <LoadingScreen />;
+	}
 
-  const handleScoreSubmitted = useCallback(() => {
-    setShowScoreSubmission(false);
-    resetGame();
-  }, [resetGame]);
+	if (gameOver) {
+		return (
+			<>
+				<GameOverScreen
+					isWon={isGameWon}
+					elapsedTime={elapsedTime}
+					onReset={resetGame}
+					onSubmitScore={handleSubmitScore}
+				/>
+				{showScoreSubmission && isGameWon && (
+					<ScoreSubmission
+						time={elapsedTime}
+						onScoreSubmitted={handleScoreSubmitted}
+					/>
+				)}
+			</>
+		);
+	}
 
-  if (isLoading) {
-    return (
-      <div
-        id="main"
-        className="h-screen w-screen bg-gradient-to-b from-slate-900 to-slate-800 flex items-center justify-center"
-      >
-        <div className="text-white flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin" />
-          <p className="text-lg">Loading game...</p>
-        </div>
-      </div>
-    );
-  }
+	if (!tiles.length) {
+		return <WelcomeScreen onStart={resetGame} />;
+	}
 
-  if (gameOver) {
-    return (
-      <div
-        id="main"
-        className="h-screen w-screen bg-gradient-to-b from-slate-900 to-slate-800 flex items-center justify-center"
-      >
-        <div className="text-white flex flex-col items-center gap-4">
-          <p className="text-lg">
-            {isGameWon
-              ? "Congratulations! You've won!"
-              : "Game Over - No more possible moves!"}
-          </p>
-          <Button variant="default" onClick={resetGame}>
-            <RotateCcw className="mr-2 h-4 w-4" />
-            Restart
-          </Button>
-          {isGameWon && !showScoreSubmission && (
-            <Button
-              variant="default"
-              onClick={() => setShowScoreSubmission(true)}
-            >
-              Submit Score
-            </Button>
-          )}
-        </div>
-        {showScoreSubmission && isGameWon && (
-          <ScoreSubmission time={elapsedTime} onScoreSubmitted={handleScoreSubmitted} />
-        )}
-      </div>
-    );
-  }
+	return (
+		<div className="relative h-screen w-screen overflow-hidden">
+			{/* UI Layer */}
+			<div className="absolute left-4 top-4 z-10">
+				<GameInfoPanel
+					possibleMoves={possibleMoves}
+					elapsedTime={elapsedTime}
+					onReset={resetGame}
+				/>
+			</div>
 
-  if (!tiles.length) {
-    return (
-      <div
-        id="main"
-        className="h-screen w-screen bg-gradient-to-b from-slate-900 to-slate-800"
-      >
-        <div className="h-full w-full flex flex-col items-center justify-center">
-          <div className="text-white flex flex-col items-center gap-6">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
-              Welcome to Fast Mahjong
-            </h1>
-            <p className="text-lg text-slate-300 tracking-wide">
-              Experience the classic game reimagined
-            </p>
-          </div>
-          <div className="w-64 h-64">
-            <SplashTile />
-          </div>
-          <Button
-            variant="default"
-            className="mt-8 bg-slate-700 hover:bg-slate-600"
-            onClick={resetGame}
-          >
-            Start Game
-          </Button>
-        </div>
-      </div>
-    );
-  }
+			<div className="absolute right-4 top-4 z-10">
+				<TopScores />
+			</div>
 
-  return (
-    <div id="main" className="relative h-screen w-screen">
-      {/* Game Info Panel */}
-      <div className="absolute left-4 top-4 z-10 space-y-4">
-        <Card className="w-64 bg-slate-800/90 text-white shadow-xl">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-bold">Fast Mahjong</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <span className="text-sm">
-                  Remaining moves: {possibleMoves ?? 0}
-                </span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="text-sm">Time: {formatTime(elapsedTime)}</span>
-              </div>
-              <Button
-                variant="default"
-                className="mt-4 w-full bg-slate-700 hover:bg-slate-600"
-                onClick={resetGame}
-              >
-                <RotateCcw className="mr-2 h-4 w-4" />
-                Reset Game
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+			<div className="absolute bottom-4 right-4 z-10">
+				<ControlsHelp />
+			</div>
 
-      <TopScores />
-
-      <div className="h-full w-full">
-        <Canvas shadows className="h-full w-full">
-          <PerspectiveCamera
-            ref={cameraRef}
-            makeDefault
-            fov={75}
-            near={0.1}
-            far={1000}
-            rotation={[-0.3, -0.3, -0.2]}
-          />
-          <OrbitControls
-            mouseButtons={{
-              LEFT: undefined,
-              RIGHT: THREE.MOUSE.ROTATE,
-              MIDDLE: THREE.MOUSE.ROTATE,
-            }}
-            enableDamping={true}
-            enablePan={true}
-            enableZoom={true}
-            maxPolarAngle={Math.PI / 2}
-            minPolarAngle={Math.PI / 12}
-            minDistance={10}
-            maxDistance={30}
-            target={[0, 0, 0]}
-          />
-
-          <ambientLight intensity={0.4} />
-          <directionalLight
-            position={[15, 15, 5]}
-            intensity={0.7}
-            castShadow
-            shadow-mapSize-width={2048}
-            shadow-mapSize-height={2048}
-          />
-          <directionalLight position={[-10, 12, -5]} intensity={0.3} />
-
-          <group position={[0, 0, 0]}>
-            {tiles.map((tile) => (
-              <MahjongTile key={tile.id} tile={tile} />
-            ))}
-          </group>
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.5, 0]} receiveShadow> {/* Position below tiles */}
-            <planeGeometry args={[500, 500]} /> {/* Adjust size as needed */}
-            <meshStandardMaterial color="#3a4a5a" roughness={0.8} metalness={0.1} /> {/* Darker, less reflective material */}
-            {/* Or maybe a texture? */}
-          </mesh>
-        </Canvas>
-      </div>
-
-      <div className="absolute bottom-4 right-4 z-10">
-        <div className="relative">
-          <Button
-            variant="default"
-            size="sm"
-            className="bg-slate-800/90 hover:bg-slate-700/90"
-            onClick={() => setShowControls(!showControls)}
-          >
-            <span className="text-sm">🎮</span>
-          </Button>
-
-          {showControls && (
-            <Card className="absolute bottom-12 right-0 w-64 bg-slate-800/90 text-white shadow-xl">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-bold">Controls</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="text-xs space-y-1">
-                  <li>🖱️ Right Click + Drag: Pan camera</li>
-                  <li>🖱️ Scroll Wheel: Zoom in/out</li>
-                </ul>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+			<Canvas
+				shadows
+				dpr={[1, 2]}
+				performance={{ min: 0.5 }}
+				gl={{
+					antialias: true,
+					powerPreference: "high-performance",
+				}}
+				className="h-full w-full"
+			>
+				<GameScene />
+			</Canvas>
+		</div>
+	);
 }

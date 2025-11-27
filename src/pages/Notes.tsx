@@ -1,7 +1,5 @@
 const Notes = () => {
-  return (
-    <div>Notes</div>
-  )
-}
+	return <div>Notes</div>;
+};
 
-export default Notes
+export default Notes;
