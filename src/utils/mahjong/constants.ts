@@ -6,19 +6,29 @@ export const TILE_SYMBOLS = {
   },
   winds: ['North', 'South', 'East', 'West'],
   dragons: ['Chun', 'Haku', 'Hatsu'],
-  seasons: ['Season1', 'Season2'],
-  flowers: ['Bamboo1', 'Bamboo2']
-};
+  seasons: ['Season1', 'Season2', 'Season3', 'Season4'],
+  flowers: ['Bamboo1', 'Bamboo2', 'Bamboo3', 'Bamboo4']
+} as const;
+
+export const ALL_SYMBOLS: string[] = [
+  ...TILE_SYMBOLS.suits.man,
+  ...TILE_SYMBOLS.suits.pin,
+  ...TILE_SYMBOLS.suits.sou,
+  ...TILE_SYMBOLS.winds,
+  ...TILE_SYMBOLS.dragons,
+  ...TILE_SYMBOLS.seasons,
+  ...TILE_SYMBOLS.flowers
+];
 
 export const SPACING = {
   X: 1.1,
   Y: 0.52,
   Z: 1.6
-};
+} as const;
 
 export const CENTER_OFFSET = {
   X: -8.4,
   Z: -5.6
-};
+} as const;
 
-export const MAX_GENERATION_ATTEMPTS = 50;
+export const MAX_GENERATION_ATTEMPTS = 20;

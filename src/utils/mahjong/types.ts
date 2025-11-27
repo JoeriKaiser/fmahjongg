@@ -1,31 +1,24 @@
+export interface Position {
+  x: number;
+  y: number;
+  z: number;
+}
+
 export interface TileData {
   id: string;
   symbol: string;
-  position: {
-    x: number;
-    y: number;
-    z: number;
-  };
-  gridPosition: {
-    x: number;
-    y: number;
-    z: number;
-  };
+  position: Position;
+  gridPosition: Position;
   layer: number;
   isSelected: boolean;
   isRemoved: boolean;
   isAccessible: boolean;
 }
 
-export interface ValidationState {
-  tiles: TileData[];
-  removedTiles: Set<string>;
-  grid: { [key: string]: TileData[] };
-}
-
 export interface TileNeighbors {
   top: boolean;
   left: boolean;
   right: boolean;
-  splitAbove: boolean;
 }
+
+export type TileGrid = Map<string, TileData>;

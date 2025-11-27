@@ -56,9 +56,10 @@ export const LAYER_LAYOUTS: number[][][] = [
   ]
 ];
 
-export function countTilesNeededPerLayer(): number[] {
-  return LAYER_LAYOUTS.map(
-    (layer: number[][]) =>
-      layer.flat().filter((val: number) => val === 1 || val === 2 || val === 3).length
+export function countTotalTiles(): number {
+  return LAYER_LAYOUTS.reduce(
+    (total, layer) =>
+      total + layer.flat().filter((val) => val >= 1 && val <= 3).length,
+    0
   );
 }
