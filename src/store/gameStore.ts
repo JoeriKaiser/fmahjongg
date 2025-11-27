@@ -1,226 +1,195 @@
-import { createTileGrid, getNeighbors } from "@/utils/mahjong/grid/gridUtils";
+import { create } from "zustand";
+import { subscribeWithSelector } from "zustand/middleware";
+import { createTileGrid } from "@/utils/mahjong/grid/gridUtils";
 import { generateInitialLayout } from "@/utils/mahjong/layout/generator";
 import { canMatch } from "@/utils/mahjong/matching/matcher";
-import type { TileData } from "@/utils/mahjong/types";
+import type { TileData, TileGrid } from "@/utils/mahjong/types";
 import { findAvailableMoves } from "@/utils/mahjong/validation/moves";
-import * as zu from "zustand";
-
-interface MatchingPair {
-  tile1Id: string;
-  tile2Id: string;
-}
 
 interface GameState {
-  tiles: TileData[];
-  selectedTile: TileData | null;
-  gameOver: boolean;
-  isGameWon: boolean;
-  isLoading: boolean;
-  possibleMoves: number;
-  matchingPairs: MatchingPair[];
+	tiles: TileData[];
+	grid: TileGrid;
+	selectedTile: TileData | null;
+	gameOver: boolean;
+	isGameWon: boolean;
+	isLoading: boolean;
+	possibleMoves: number;
+	startTime: number | null;
+	elapsedTime: number;
+	timerIntervalId: number | null;
 
-  startTime: number | null;
-  elapsedTime: number;
-  timerIntervalId: number | null;
-
-  selectTile: (tile: TileData) => void;
-  resetGame: () => void;
-  setLoading: (loading: boolean) => void;
-  updatePossibleMoves: () => void;
-  startTimer: () => void;
-  stopTimer: () => void;
-  updateTimer: () => void;
+	selectTile: (tile: TileData) => void;
+	resetGame: () => void;
+	setLoading: (loading: boolean) => void;
+	updatePossibleMoves: () => void;
+	startTimer: () => void;
+	stopTimer: () => void;
+	updateTimer: () => void;
 }
 
-export const useGameStore = zu.create<GameState>((set, get) => ({
-  tiles: [],
-  selectedTile: null,
-  gameOver: false,
-  isGameWon: false,
-  isLoading: false,
-  possibleMoves: 0,
-  matchingPairs: [],
-  startTime: null,
-  elapsedTime: 0,
-  timerIntervalId: null,
+export const useGameStore = create<GameState>()(
+	subscribeWithSelector((set, get) => ({
+		tiles: [],
+		grid: new Map(),
+		selectedTile: null,
+		gameOver: false,
+		isGameWon: false,
+		isLoading: false,
+		possibleMoves: 0,
+		startTime: null,
+		elapsedTime: 0,
+		timerIntervalId: null,
 
-  selectTile: (tile) => {
-    const state = get();
-    
-    if (tile.isRemoved) return;
+		selectTile: (tile) => {
+			const state = get();
 
-    if (!state.startTime && !state.gameOver) {
-      get().startTimer();
-    }
+			if (tile.isRemoved || state.gameOver) return;
 
-    const clearedTiles = state.tiles.map((t) => ({
-      ...t,
-      isSelected: false,
-    }));
+			if (!state.startTime) {
+				get().startTimer();
+			}
 
-    if (!state.selectedTile) {
-      set({
-        selectedTile: tile,
-        tiles: clearedTiles.map((t) =>
-          t.id === tile.id ? { ...t, isSelected: true } : t
-        ),
-      });
-      return;
-    }
+			if (!state.selectedTile) {
+				set({
+					selectedTile: tile,
+					tiles: state.tiles.map((t) => ({
+						...t,
+						isSelected: t.id === tile.id,
+					})),
+				});
+				return;
+			}
 
-    if (state.selectedTile.id === tile.id) {
-      set({
-        selectedTile: null,
-        tiles: clearedTiles,
-      });
-      return;
-    }
+			if (state.selectedTile.id === tile.id) {
+				set({
+					selectedTile: null,
+					tiles: state.tiles.map((t) => ({ ...t, isSelected: false })),
+				});
+				return;
+			}
 
-    const grid = createTileGrid(state.tiles.filter((t) => !t.isRemoved));
-    const tile1Neighbors = getNeighbors(state.selectedTile, grid);
-    const tile2Neighbors = getNeighbors(tile, grid);
+			if (canMatch(state.selectedTile, tile, state.grid)) {
+				const updatedTiles = state.tiles.map((t) => ({
+					...t,
+					isSelected: false,
+					isRemoved:
+						t.isRemoved || t.id === tile.id || t.id === state.selectedTile?.id,
+				}));
 
-    if (canMatch(state.selectedTile, tile, tile1Neighbors, tile2Neighbors)) {
-      const updatedTiles = clearedTiles.map((t) =>
-        t.id === tile.id || t.id === state.selectedTile?.id
-          ? { ...t, isRemoved: true }
-          : t
-      );
+				const newGrid = createTileGrid(updatedTiles);
 
-      set({
-        selectedTile: null,
-        tiles: updatedTiles,
-      });
+				set({
+					selectedTile: null,
+					tiles: updatedTiles,
+					grid: newGrid,
+				});
 
-      setTimeout(() => {
-        get().updatePossibleMoves();
-      }, 0);
-    } else {
-      set({
-        selectedTile: tile,
-        tiles: clearedTiles.map((t) =>
-          t.id === tile.id ? { ...t, isSelected: true } : t
-        ),
-      });
-    }
-  },
+				queueMicrotask(() => get().updatePossibleMoves());
+			} else {
+				set({
+					selectedTile: tile,
+					tiles: state.tiles.map((t) => ({
+						...t,
+						isSelected: t.id === tile.id,
+					})),
+				});
+			}
+		},
 
-  resetGame: () => {
-    const state = get();
-    
-    if (state.timerIntervalId) {
-      clearInterval(state.timerIntervalId);
-    }
+		resetGame: () => {
+			const state = get();
 
-    set({
-      isLoading: true,
-      startTime: null,
-      elapsedTime: 0,
-      timerIntervalId: null,
-      gameOver: false,
-      isGameWon: false,
-      selectedTile: null,
-    });
+			if (state.timerIntervalId) {
+				clearInterval(state.timerIntervalId);
+			}
 
-    setTimeout(() => {
-      const newTiles = generateInitialLayout();
-      set({
-        tiles: newTiles,
-        isLoading: false,
-      });
-      
-      setTimeout(() => {
-        get().updatePossibleMoves();
-      }, 0);
-    }, 100);
-  },
+			set({
+				isLoading: true,
+				startTime: null,
+				elapsedTime: 0,
+				timerIntervalId: null,
+				gameOver: false,
+				isGameWon: false,
+				selectedTile: null,
+				possibleMoves: 0,
+			});
 
-  setLoading: (loading: boolean) => set({ isLoading: loading }),
+			const generate = () => {
+				const newTiles = generateInitialLayout();
+				const newGrid = createTileGrid(newTiles);
 
-  updatePossibleMoves: () => {
-    const state = get();
-    const activeTiles = state.tiles.filter((t) => !t.isRemoved);
-    
-    if (activeTiles.length === 0) {
-      set({
-        gameOver: true,
-        isGameWon: true,
-      });
-      get().stopTimer();
-      return;
-    }
+				set({
+					tiles: newTiles,
+					grid: newGrid,
+					isLoading: false,
+				});
 
-    const validationState = {
-      tiles: state.tiles,
-      removedTiles: new Set(
-        state.tiles.filter((t) => t.isRemoved).map((t) => t.id)
-      ),
-      grid: createTileGrid(activeTiles),
-    };
+				queueMicrotask(() => get().updatePossibleMoves());
+			};
 
-    const moves = findAvailableMoves(validationState);
-    const pairs = moves.map((move) => ({
-      tile1Id: move.tile1.id,
-      tile2Id: move.tile2.id,
-    }));
+			if ("requestIdleCallback" in window) {
+				requestIdleCallback(generate, { timeout: 100 });
+			} else {
+				setTimeout(generate, 16);
+			}
+		},
 
-    if (moves.length === 0) {
-      set({
-        gameOver: true,
-        isGameWon: false,
-        possibleMoves: 0,
-        matchingPairs: [],
-      });
-      get().stopTimer();
-    } else {
-      set({
-        possibleMoves: moves.length,
-        matchingPairs: pairs,
-      });
-    }
-  },
+		setLoading: (loading) => set({ isLoading: loading }),
 
-  startTimer: () => {
-    const state = get();
-    
-    if (state.timerIntervalId) {
-      clearInterval(state.timerIntervalId);
-    }
+		updatePossibleMoves: () => {
+			const state = get();
+			const activeTiles = state.tiles.filter((t) => !t.isRemoved);
 
-    const startTime = Date.now();
-    const intervalId = window.setInterval(() => {
-      get().updateTimer();
-    }, 1000);
+			if (activeTiles.length === 0) {
+				get().stopTimer();
+				set({ gameOver: true, isGameWon: true, possibleMoves: 0 });
+				return;
+			}
 
-    set({
-      startTime,
-      timerIntervalId: intervalId,
-    });
-  },
+			const moves = findAvailableMoves(state.tiles, state.grid);
 
-  stopTimer: () => {
-    const state = get();
-    
-    if (state.timerIntervalId) {
-      clearInterval(state.timerIntervalId);
-    }
+			if (moves.length === 0) {
+				get().stopTimer();
+				set({ gameOver: true, isGameWon: false, possibleMoves: 0 });
+			} else {
+				set({ possibleMoves: moves.length });
+			}
+		},
 
-    if (state.startTime) {
-      set({
-        elapsedTime: Math.floor((Date.now() - state.startTime) / 1000),
-        startTime: null,
-        timerIntervalId: null,
-      });
-    }
-  },
+		startTimer: () => {
+			const state = get();
 
-  updateTimer: () => {
-    const state = get();
-    
-    if (state.startTime) {
-      set({
-        elapsedTime: Math.floor((Date.now() - state.startTime) / 1000),
-      });
-    }
-  },
-}));
+			if (state.timerIntervalId) {
+				clearInterval(state.timerIntervalId);
+			}
+
+			const startTime = Date.now();
+			const intervalId = window.setInterval(() => get().updateTimer(), 1000);
+
+			set({ startTime, timerIntervalId: intervalId });
+		},
+
+		stopTimer: () => {
+			const state = get();
+
+			if (state.timerIntervalId) {
+				clearInterval(state.timerIntervalId);
+			}
+
+			if (state.startTime) {
+				set({
+					elapsedTime: Math.floor((Date.now() - state.startTime) / 1000),
+					startTime: null,
+					timerIntervalId: null,
+				});
+			}
+		},
+
+		updateTimer: () => {
+			const state = get();
+			if (state.startTime) {
+				set({ elapsedTime: Math.floor((Date.now() - state.startTime) / 1000) });
+			}
+		},
+	})),
+);

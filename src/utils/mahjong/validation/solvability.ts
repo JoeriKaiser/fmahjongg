@@ -1,39 +1,42 @@
-import { createTileGrid } from "../grid/gridUtils";
-import type { TileData, ValidationState } from "../types";
-import { findAvailableMoves } from "./moves";
+import { createGridKey, createTileGrid } from "../grid/gridUtils";
+import { findMatchableTiles } from "../matching/matcher";
+import type { TileData } from "../types";
 
-interface Move {
-	tile1: TileData;
-	tile2: TileData;
-}
+export function isLayoutSolvable(tiles: TileData[]): boolean {
+	const workingTiles = tiles.map((t) => ({ ...t }));
+	const grid = createTileGrid(workingTiles);
 
-export function isLayoutSolvable(initialTiles: TileData[]): boolean {
-	const state: ValidationState = {
-		tiles: [...initialTiles],
-		removedTiles: new Set<string>(),
-		grid: createTileGrid(initialTiles),
-	};
+	let remaining = workingTiles.length;
 
-	while (true) {
-		const moves = findAvailableMoves(state);
-		if (moves.length === 0) {
-			return (
-				state.tiles.filter((t) => !state.removedTiles.has(t.id)).length === 0
-			);
+	while (remaining > 0) {
+		const matches = findMatchableTiles(workingTiles, grid);
+
+		if (matches.length === 0) {
+			return remaining === 0;
 		}
 
-		moves.sort((a: Move, b: Move) => {
-			if (a.tile1.layer !== b.tile1.layer) {
-				return b.tile1.layer - a.tile1.layer;
-			}
-			return a.tile1.gridPosition.z - b.tile1.gridPosition.z;
-		});
+		let bestMatch = matches[0];
+		let bestScore = bestMatch[0].layer + bestMatch[1].layer;
 
-		const move = moves[0];
-		state.removedTiles.add(move.tile1.id);
-		state.removedTiles.add(move.tile2.id);
-		state.grid = createTileGrid(
-			state.tiles.filter((t) => !state.removedTiles.has(t.id)),
-		);
+		for (let i = 1; i < matches.length; i++) {
+			const score = matches[i][0].layer + matches[i][1].layer;
+			if (score > bestScore) {
+				bestScore = score;
+				bestMatch = matches[i];
+			}
+		}
+
+		const [t1, t2] = bestMatch;
+		t1.isRemoved = true;
+		t2.isRemoved = true;
+
+		const { x: x1, y: y1, z: z1 } = t1.gridPosition;
+		const { x: x2, y: y2, z: z2 } = t2.gridPosition;
+		grid.delete(createGridKey(x1, y1, z1));
+		grid.delete(createGridKey(x2, y2, z2));
+
+		remaining -= 2;
 	}
+
+	return true;
 }
