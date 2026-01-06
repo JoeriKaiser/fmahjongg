@@ -84,7 +84,7 @@ const TileInstance = memo(function TileInstance({
 	useFrame((_, delta) => {
 		if (!sideMatRef.current || !meshRef.current) return;
 
-		const targetEm = hovered.current ? 0.3 : tile.isSelected ? 0.2 : 0;
+		const targetEm = hovered.current ? 0.5 : tile.isSelected ? 0.4 : 0;
 		targetEmissive.current = targetEm;
 		currentEmissive.current = THREE.MathUtils.lerp(
 			currentEmissive.current,
@@ -124,7 +124,7 @@ const TileInstance = memo(function TileInstance({
 		return null;
 	}
 
-	const sideColor = tile.isSelected ? "#ffe8e8" : "#ffffff";
+	const sideColor = tile.isSelected ? "#ffcccc" : "#ffffff";
 
 	return (
 		<group

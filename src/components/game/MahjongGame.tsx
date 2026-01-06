@@ -79,7 +79,6 @@ const ControlsHelp = memo(function ControlsHelp() {
 					<CardContent>
 						<ul className="text-xs space-y-1">
 							<li>🖱️ Left Click: Select tile</li>
-							<li>🖱️ Right Click + Drag: Rotate camera</li>
 							<li>🖱️ Scroll: Zoom in/out</li>
 						</ul>
 					</CardContent>
@@ -200,7 +199,7 @@ const GameScene = memo(function GameScene() {
 
 	useEffect(() => {
 		if (cameraRef.current) {
-			cameraRef.current.position.set(0, 15, 20);
+			cameraRef.current.position.set(0, 18, 5);
 			cameraRef.current.lookAt(0, 0, 0);
 		}
 	}, []);
@@ -214,22 +213,15 @@ const GameScene = memo(function GameScene() {
 				fov={75}
 				near={0.1}
 				far={1000}
-				rotation={[-0.3, -0.3, -0.2]}
 			/>
 			<OrbitControls
-				mouseButtons={{
-					LEFT: undefined,
-					RIGHT: THREE.MOUSE.ROTATE,
-					MIDDLE: THREE.MOUSE.ROTATE,
-				}}
 				enableDamping
 				dampingFactor={0.05}
-				enablePan
+				enablePan={false}
+				enableRotate={false}
 				enableZoom
-				maxPolarAngle={Math.PI / 2}
-				minPolarAngle={Math.PI / 12}
-				minDistance={10}
-				maxDistance={30}
+				minDistance={8}
+				maxDistance={80}
 				target={[0, 0, 0]}
 			/>
 
@@ -238,13 +230,13 @@ const GameScene = memo(function GameScene() {
 				position={[15, 15, 5]}
 				intensity={0.8}
 				castShadow
-				shadow-mapSize-width={1024}
-				shadow-mapSize-height={1024}
-				shadow-camera-far={50}
-				shadow-camera-left={-20}
-				shadow-camera-right={20}
-				shadow-camera-top={20}
-				shadow-camera-bottom={-20}
+				shadow-mapSize-width={512}
+				shadow-mapSize-height={512}
+				shadow-camera-far={30}
+				shadow-camera-left={-15}
+				shadow-camera-right={15}
+				shadow-camera-top={15}
+				shadow-camera-bottom={-15}
 			/>
 			<directionalLight position={[-10, 12, -5]} intensity={0.3} />
 
@@ -276,6 +268,7 @@ export function MahjongGame() {
 	const elapsedTime = useGameStore((s) => s.elapsedTime);
 	const possibleMoves = useGameStore((s) => s.possibleMoves);
 	const resetGame = useGameStore((s) => s.resetGame);
+	const undo = useGameStore((s) => s.undo);
 
 	const handleScoreSubmitted = useCallback(() => {
 		setShowScoreSubmission(false);
@@ -285,6 +278,21 @@ export function MahjongGame() {
 	const handleSubmitScore = useCallback(() => {
 		setShowScoreSubmission(true);
 	}, []);
+
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key === " ") {
+				e.preventDefault();
+				resetGame();
+			} else if (e.ctrlKey && e.key === "z") {
+				e.preventDefault();
+				undo();
+			}
+		};
+
+		window.addEventListener("keydown", handleKeyDown);
+		return () => window.removeEventListener("keydown", handleKeyDown);
+	}, [resetGame, undo]);
 
 	if (isLoading) {
 		return <LoadingScreen />;

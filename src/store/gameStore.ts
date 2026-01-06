@@ -17,6 +17,8 @@ interface GameState {
 	startTime: number | null;
 	elapsedTime: number;
 	timerIntervalId: number | null;
+	previousTiles: TileData[] | null;
+	previousGrid: TileGrid | null;
 
 	selectTile: (tile: TileData) => void;
 	resetGame: () => void;
@@ -25,6 +27,9 @@ interface GameState {
 	startTimer: () => void;
 	stopTimer: () => void;
 	updateTimer: () => void;
+	undo: () => void;
+	saveGame: () => void;
+	loadGame: () => boolean;
 }
 
 export const useGameStore = create<GameState>()(
@@ -39,6 +44,8 @@ export const useGameStore = create<GameState>()(
 		startTime: null,
 		elapsedTime: 0,
 		timerIntervalId: null,
+		previousTiles: null,
+		previousGrid: null,
 
 		selectTile: (tile) => {
 			const state = get();
@@ -82,6 +89,8 @@ export const useGameStore = create<GameState>()(
 					selectedTile: null,
 					tiles: updatedTiles,
 					grid: newGrid,
+					previousTiles: state.tiles,
+					previousGrid: state.grid,
 				});
 
 				queueMicrotask(() => get().updatePossibleMoves());
@@ -112,6 +121,8 @@ export const useGameStore = create<GameState>()(
 				isGameWon: false,
 				selectedTile: null,
 				possibleMoves: 0,
+				previousTiles: null,
+				previousGrid: null,
 			});
 
 			const generate = () => {
@@ -127,8 +138,8 @@ export const useGameStore = create<GameState>()(
 				queueMicrotask(() => get().updatePossibleMoves());
 			};
 
-			if ("requestIdleCallback" in window) {
-				requestIdleCallback(generate, { timeout: 100 });
+			if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+				window.requestIdleCallback(generate, { timeout: 100 });
 			} else {
 				setTimeout(generate, 16);
 			}
@@ -190,6 +201,66 @@ export const useGameStore = create<GameState>()(
 			if (state.startTime) {
 				set({ elapsedTime: Math.floor((Date.now() - state.startTime) / 1000) });
 			}
+		},
+
+		undo: () => {
+			const state = get();
+			if (state.previousTiles && state.previousGrid) {
+				set({
+					tiles: state.previousTiles,
+					grid: state.previousGrid,
+					previousTiles: null,
+					previousGrid: null,
+					selectedTile: null,
+				});
+				queueMicrotask(() => get().updatePossibleMoves());
+			}
+		},
+
+		saveGame: () => {
+			const state = get();
+			const saveData = {
+				tiles: state.tiles,
+				grid: Array.from(state.grid.entries()),
+				selectedTile: state.selectedTile,
+				gameOver: state.gameOver,
+				isGameWon: state.isGameWon,
+				isLoading: state.isLoading,
+				possibleMoves: state.possibleMoves,
+				startTime: state.startTime,
+				elapsedTime: state.elapsedTime,
+				timerIntervalId: null, // don't save interval
+				previousTiles: state.previousTiles,
+				previousGrid: state.previousGrid
+					? Array.from(state.previousGrid.entries())
+					: null,
+			};
+			localStorage.setItem("mahjong-save", JSON.stringify(saveData));
+		},
+
+		loadGame: () => {
+			const saved = localStorage.getItem("mahjong-save");
+			if (saved) {
+				const saveData = JSON.parse(saved);
+				set({
+					tiles: saveData.tiles,
+					grid: new Map(saveData.grid),
+					selectedTile: saveData.selectedTile,
+					gameOver: saveData.gameOver,
+					isGameWon: saveData.isGameWon,
+					isLoading: saveData.isLoading,
+					possibleMoves: saveData.possibleMoves,
+					startTime: saveData.startTime,
+					elapsedTime: saveData.elapsedTime,
+					timerIntervalId: null,
+					previousTiles: saveData.previousTiles,
+					previousGrid: saveData.previousGrid
+						? new Map(saveData.previousGrid)
+						: null,
+				});
+				return true;
+			}
+			return false;
 		},
 	})),
 );
