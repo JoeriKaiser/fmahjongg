@@ -1,12 +1,13 @@
 import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
-import { Loader2, RotateCcw } from "lucide-react";
+import { Home, Loader2, RotateCcw, Share2 } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useGameStore } from "@/store/gameStore";
-import { SplashTile } from "../show/SplashTile";
+import { shareToClipboard } from "@/utils/dailyPuzzle";
+import { DailyHome } from "./DailyHome";
 import { ScoreSubmission } from "./ScoreSubmission";
 import { TileInstances } from "./TileInstances";
 import { TopScores } from "./TopScores";
@@ -17,10 +18,16 @@ const GameInfoPanel = memo(function GameInfoPanel({
 	possibleMoves,
 	elapsedTime,
 	onReset,
+	onHome,
+	isDailyMode,
+	puzzleNumber,
 }: {
 	possibleMoves: number;
 	elapsedTime: number;
 	onReset: () => void;
+	onHome: () => void;
+	isDailyMode: boolean;
+	puzzleNumber: number;
 }) {
 	const formatTime = (seconds: number) => {
 		const mins = Math.floor(seconds / 60);
@@ -31,7 +38,9 @@ const GameInfoPanel = memo(function GameInfoPanel({
 	return (
 		<Card className="w-64 bg-slate-800/90 text-white shadow-xl backdrop-blur-sm">
 			<CardHeader className="pb-2">
-				<CardTitle className="text-lg font-bold">Fast Mahjong</CardTitle>
+				<CardTitle className="text-lg font-bold">
+					{isDailyMode ? `Daily #${puzzleNumber}` : "Fast Mahjong"}
+				</CardTitle>
 			</CardHeader>
 			<CardContent>
 				<div className="space-y-2">
@@ -43,14 +52,24 @@ const GameInfoPanel = memo(function GameInfoPanel({
 						<span>Time:</span>
 						<span className="font-mono">{formatTime(elapsedTime)}</span>
 					</div>
-					<Button
-						variant="default"
-						className="mt-4 w-full bg-slate-700 hover:bg-slate-600 transition-colors"
-						onClick={onReset}
-					>
-						<RotateCcw className="mr-2 h-4 w-4" />
-						Reset Game
-					</Button>
+					<div className="flex gap-2 mt-4">
+						<Button
+							variant="default"
+							size="sm"
+							className="flex-1 bg-slate-700 hover:bg-slate-600 transition-colors"
+							onClick={onReset}
+						>
+							<RotateCcw className="h-4 w-4" />
+						</Button>
+						<Button
+							variant="default"
+							size="sm"
+							className="flex-1 bg-slate-700 hover:bg-slate-600 transition-colors"
+							onClick={onHome}
+						>
+							<Home className="h-4 w-4" />
+						</Button>
+					</div>
 				</div>
 			</CardContent>
 		</Card>
@@ -107,46 +126,29 @@ const LoadingScreen = memo(function LoadingScreen() {
 	);
 });
 
-const WelcomeScreen = memo(function WelcomeScreen({
-	onStart,
-}: {
-	onStart: () => void;
-}) {
-	return (
-		<div className="h-screen w-screen bg-gradient-to-b from-slate-900 to-slate-800">
-			<div className="h-full w-full flex flex-col items-center justify-center">
-				<div className="text-white flex flex-col items-center gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-					<h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
-						Welcome to Fast Mahjong
-					</h1>
-					<p className="text-lg text-slate-300 tracking-wide">
-						Experience the classic game reimagined
-					</p>
-				</div>
-				<div className="w-64 h-64 animate-in fade-in duration-700 delay-200">
-					<SplashTile />
-				</div>
-				<Button
-					variant="default"
-					className="mt-8 bg-emerald-600 hover:bg-emerald-500 transition-all hover:scale-105 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300"
-					onClick={onStart}
-				>
-					Start Game
-				</Button>
-			</div>
-		</div>
-	);
-});
-
 const GameOverScreen = memo(function GameOverScreen({
 	isWon,
 	onReset,
+	onHome,
 	onSubmitScore,
+	isDailyMode,
 }: {
 	isWon: boolean;
 	onReset: () => void;
+	onHome: () => void;
 	onSubmitScore: () => void;
+	isDailyMode: boolean;
 }) {
+	const [shareSuccess, setShareSuccess] = useState(false);
+
+	const handleShare = async () => {
+		const success = await shareToClipboard();
+		if (success) {
+			setShareSuccess(true);
+			setTimeout(() => setShareSuccess(false), 2000);
+		}
+	};
+
 	return (
 		<div className="h-screen w-screen bg-gradient-to-b from-slate-900 to-slate-800 flex items-center justify-center">
 			<div className="text-white flex flex-col items-center gap-6 animate-in fade-in zoom-in-95 duration-300">
@@ -159,23 +161,64 @@ const GameOverScreen = memo(function GameOverScreen({
 				<p className="text-slate-300">
 					{isWon ? "You've cleared all tiles!" : "No more moves available"}
 				</p>
-				<div className="flex gap-4 mt-4">
-					<Button
-						variant="default"
-						className="bg-slate-700 hover:bg-slate-600 transition-colors"
-						onClick={onReset}
-					>
-						<RotateCcw className="mr-2 h-4 w-4" />
-						Play Again
-					</Button>
-					{isWon && (
-						<Button
-							variant="default"
-							className="bg-emerald-600 hover:bg-emerald-500 transition-colors"
-							onClick={onSubmitScore}
-						>
-							Submit Score
-						</Button>
+				<div className="flex flex-wrap justify-center gap-3 mt-4">
+					{isDailyMode ? (
+						<>
+							<Button
+								variant="default"
+								className="bg-slate-700 hover:bg-slate-600 transition-colors"
+								onClick={onHome}
+							>
+								<Home className="mr-2 h-4 w-4" />
+								Home
+							</Button>
+							{isWon && (
+								<Button
+									variant="default"
+									className="bg-blue-600 hover:bg-blue-500 transition-colors"
+									onClick={handleShare}
+								>
+									<Share2 className="mr-2 h-4 w-4" />
+									{shareSuccess ? "Copied!" : "Share"}
+								</Button>
+							)}
+							<Button
+								variant="default"
+								className="bg-emerald-600 hover:bg-emerald-500 transition-colors"
+								onClick={onReset}
+							>
+								<RotateCcw className="mr-2 h-4 w-4" />
+								Try Again
+							</Button>
+						</>
+					) : (
+						<>
+							<Button
+								variant="default"
+								className="bg-slate-700 hover:bg-slate-600 transition-colors"
+								onClick={onHome}
+							>
+								<Home className="mr-2 h-4 w-4" />
+								Home
+							</Button>
+							<Button
+								variant="default"
+								className="bg-emerald-600 hover:bg-emerald-500 transition-colors"
+								onClick={onReset}
+							>
+								<RotateCcw className="mr-2 h-4 w-4" />
+								Play Again
+							</Button>
+							{isWon && (
+								<Button
+									variant="default"
+									className="bg-blue-600 hover:bg-blue-500 transition-colors"
+									onClick={onSubmitScore}
+								>
+									Submit Score
+								</Button>
+							)}
+						</>
 					)}
 				</div>
 			</div>
@@ -260,6 +303,7 @@ const GameScene = memo(function GameScene() {
 
 export function MahjongGame() {
 	const [showScoreSubmission, setShowScoreSubmission] = useState(false);
+	const [showHome, setShowHome] = useState(true);
 
 	const tiles = useGameStore((s) => s.tiles);
 	const isLoading = useGameStore((s) => s.isLoading);
@@ -267,24 +311,49 @@ export function MahjongGame() {
 	const isGameWon = useGameStore((s) => s.isGameWon);
 	const elapsedTime = useGameStore((s) => s.elapsedTime);
 	const possibleMoves = useGameStore((s) => s.possibleMoves);
+	const isDailyMode = useGameStore((s) => s.isDailyMode);
+	const puzzleNumber = useGameStore((s) => s.puzzleNumber);
 	const resetGame = useGameStore((s) => s.resetGame);
+	const startDailyPuzzle = useGameStore((s) => s.startDailyPuzzle);
 	const undo = useGameStore((s) => s.undo);
+
+	const handleStartDaily = useCallback(() => {
+		setShowHome(false);
+		startDailyPuzzle();
+	}, [startDailyPuzzle]);
+
+	const handleStartRandom = useCallback(() => {
+		setShowHome(false);
+		resetGame();
+	}, [resetGame]);
+
+	const handleHome = useCallback(() => {
+		setShowHome(true);
+	}, []);
 
 	const handleScoreSubmitted = useCallback(() => {
 		setShowScoreSubmission(false);
-		resetGame();
-	}, [resetGame]);
+		setShowHome(true);
+	}, []);
 
 	const handleSubmitScore = useCallback(() => {
 		setShowScoreSubmission(true);
 	}, []);
 
+	const handleResetGame = useCallback(() => {
+		if (isDailyMode) {
+			startDailyPuzzle();
+		} else {
+			resetGame();
+		}
+	}, [isDailyMode, startDailyPuzzle, resetGame]);
+
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
-			if (e.key === " ") {
+			if (e.key === " " && !showHome) {
 				e.preventDefault();
-				resetGame();
-			} else if (e.ctrlKey && e.key === "z") {
+				handleResetGame();
+			} else if (e.ctrlKey && e.key === "z" && !showHome) {
 				e.preventDefault();
 				undo();
 			}
@@ -292,7 +361,16 @@ export function MahjongGame() {
 
 		window.addEventListener("keydown", handleKeyDown);
 		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [resetGame, undo]);
+	}, [handleResetGame, undo, showHome]);
+
+	if (showHome && !tiles.length) {
+		return (
+			<DailyHome
+				onStartDaily={handleStartDaily}
+				onStartRandom={handleStartRandom}
+			/>
+		);
+	}
 
 	if (isLoading) {
 		return <LoadingScreen />;
@@ -303,10 +381,12 @@ export function MahjongGame() {
 			<>
 				<GameOverScreen
 					isWon={isGameWon}
-					onReset={resetGame}
+					onReset={handleResetGame}
+					onHome={handleHome}
 					onSubmitScore={handleSubmitScore}
+					isDailyMode={isDailyMode}
 				/>
-				{showScoreSubmission && isGameWon && (
+				{showScoreSubmission && isGameWon && !isDailyMode && (
 					<ScoreSubmission
 						time={elapsedTime}
 						onScoreSubmitted={handleScoreSubmitted}
@@ -314,10 +394,6 @@ export function MahjongGame() {
 				)}
 			</>
 		);
-	}
-
-	if (!tiles.length) {
-		return <WelcomeScreen onStart={resetGame} />;
 	}
 
 	return (
@@ -329,13 +405,18 @@ export function MahjongGame() {
 				<GameInfoPanel
 					possibleMoves={possibleMoves}
 					elapsedTime={elapsedTime}
-					onReset={resetGame}
+					onReset={handleResetGame}
+					onHome={handleHome}
+					isDailyMode={isDailyMode}
+					puzzleNumber={puzzleNumber}
 				/>
 			</div>
 
-			<div className="absolute right-4 top-4 z-10">
-				<TopScores />
-			</div>
+			{!isDailyMode && (
+				<div className="absolute right-4 top-4 z-10">
+					<TopScores />
+				</div>
+			)}
 
 			<div className="absolute bottom-4 right-4 z-10">
 				<ControlsHelp />

@@ -1,10 +1,17 @@
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
+import { recordCompletion } from "@/utils/dailyPuzzle";
 import { createTileGrid } from "@/utils/mahjong/grid/gridUtils";
 import { generateInitialLayout } from "@/utils/mahjong/layout/generator";
 import { canMatch } from "@/utils/mahjong/matching/matcher";
 import type { TileData, TileGrid } from "@/utils/mahjong/types";
 import { findAvailableMoves } from "@/utils/mahjong/validation/moves";
+import {
+	getDailySeed,
+	getDateString,
+	getPuzzleNumber,
+	SeededRandom,
+} from "@/utils/seededRandom";
 
 interface GameState {
 	tiles: TileData[];
@@ -19,9 +26,13 @@ interface GameState {
 	timerIntervalId: number | null;
 	previousTiles: TileData[] | null;
 	previousGrid: TileGrid | null;
+	isDailyMode: boolean;
+	puzzleNumber: number;
+	puzzleDate: string;
 
 	selectTile: (tile: TileData) => void;
 	resetGame: () => void;
+	startDailyPuzzle: () => void;
 	setLoading: (loading: boolean) => void;
 	updatePossibleMoves: () => void;
 	startTimer: () => void;
@@ -46,6 +57,9 @@ export const useGameStore = create<GameState>()(
 		timerIntervalId: null,
 		previousTiles: null,
 		previousGrid: null,
+		isDailyMode: true,
+		puzzleNumber: getPuzzleNumber(),
+		puzzleDate: getDateString(),
 
 		selectTile: (tile) => {
 			const state = get();
@@ -123,10 +137,59 @@ export const useGameStore = create<GameState>()(
 				possibleMoves: 0,
 				previousTiles: null,
 				previousGrid: null,
+				isDailyMode: false,
 			});
 
 			const generate = () => {
 				const newTiles = generateInitialLayout();
+				const newGrid = createTileGrid(newTiles);
+
+				set({
+					tiles: newTiles,
+					grid: newGrid,
+					isLoading: false,
+				});
+
+				queueMicrotask(() => get().updatePossibleMoves());
+			};
+
+			if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+				window.requestIdleCallback(generate, { timeout: 100 });
+			} else {
+				setTimeout(generate, 16);
+			}
+		},
+
+		startDailyPuzzle: () => {
+			const state = get();
+
+			if (state.timerIntervalId) {
+				clearInterval(state.timerIntervalId);
+			}
+
+			const puzzleNumber = getPuzzleNumber();
+			const puzzleDate = getDateString();
+
+			set({
+				isLoading: true,
+				startTime: null,
+				elapsedTime: 0,
+				timerIntervalId: null,
+				gameOver: false,
+				isGameWon: false,
+				selectedTile: null,
+				possibleMoves: 0,
+				previousTiles: null,
+				previousGrid: null,
+				isDailyMode: true,
+				puzzleNumber,
+				puzzleDate,
+			});
+
+			const generate = () => {
+				const seed = getDailySeed();
+				const rng = new SeededRandom(seed);
+				const newTiles = generateInitialLayout(rng);
 				const newGrid = createTileGrid(newTiles);
 
 				set({
@@ -154,6 +217,11 @@ export const useGameStore = create<GameState>()(
 			if (activeTiles.length === 0) {
 				get().stopTimer();
 				set({ gameOver: true, isGameWon: true, possibleMoves: 0 });
+
+				// Record completion in daily mode
+				if (state.isDailyMode) {
+					recordCompletion(state.elapsedTime);
+				}
 				return;
 			}
 

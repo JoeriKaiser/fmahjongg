@@ -1,3 +1,4 @@
+import type { SeededRandom } from "@/utils/seededRandom";
 import {
 	ALL_SYMBOLS,
 	CENTER_OFFSET,
@@ -11,22 +12,22 @@ import { countTotalTiles, LAYER_LAYOUTS } from "./layouts";
 /**
  * Fisher-Yates shuffle - modifies array in place
  */
-function shuffle<T>(arr: T[]): T[] {
+function shuffle<T>(arr: T[], rng?: SeededRandom): T[] {
 	for (let i = arr.length - 1; i > 0; i--) {
-		const j = Math.floor(Math.random() * (i + 1));
+		const j = rng ? rng.nextInt(0, i + 1) : Math.floor(Math.random() * (i + 1));
 		[arr[i], arr[j]] = [arr[j], arr[i]];
 	}
 	return arr;
 }
 
-function generateDeck(totalTiles: number): string[] {
+function generateDeck(totalTiles: number, rng?: SeededRandom): string[] {
 	if (totalTiles % 2 !== 0) {
 		throw new Error("Total tiles must be even for pairing");
 	}
 
 	const deck: string[] = [];
 
-	const symbols = shuffle([...ALL_SYMBOLS]);
+	const symbols = shuffle([...ALL_SYMBOLS], rng);
 	let symbolIndex = 0;
 
 	while (deck.length < totalTiles) {
@@ -35,7 +36,7 @@ function generateDeck(totalTiles: number): string[] {
 		symbolIndex++;
 	}
 
-	return shuffle(deck);
+	return shuffle(deck, rng);
 }
 
 function createTilesFromLayout(deck: string[]): TileData[] {
@@ -84,12 +85,12 @@ function createTilesFromLayout(deck: string[]): TileData[] {
 	return tiles;
 }
 
-export function generateInitialLayout(): TileData[] {
+export function generateInitialLayout(rng?: SeededRandom): TileData[] {
 	const totalTiles = countTotalTiles();
 
 	for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS; attempt++) {
 		try {
-			const deck = generateDeck(totalTiles);
+			const deck = generateDeck(totalTiles, rng);
 			const tiles = createTilesFromLayout(deck);
 
 			if (isLayoutSolvable(tiles)) {
@@ -101,6 +102,6 @@ export function generateInitialLayout(): TileData[] {
 	}
 
 	console.warn("Could not generate solvable layout, using fallback");
-	const deck = generateDeck(totalTiles);
+	const deck = generateDeck(totalTiles, rng);
 	return createTilesFromLayout(deck);
 }
