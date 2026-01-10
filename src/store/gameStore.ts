@@ -13,6 +13,8 @@ import {
 	SeededRandom,
 } from "@/utils/seededRandom";
 
+type ViewState = "home" | "loading" | "playing" | "gameOver";
+
 interface GameState {
 	tiles: TileData[];
 	grid: TileGrid;
@@ -20,6 +22,7 @@ interface GameState {
 	gameOver: boolean;
 	isGameWon: boolean;
 	isLoading: boolean;
+	viewState: ViewState;
 	possibleMoves: number;
 	startTime: number | null;
 	elapsedTime: number;
@@ -39,6 +42,7 @@ interface GameState {
 	stopTimer: () => void;
 	updateTimer: () => void;
 	undo: () => void;
+	goHome: () => void;
 	saveGame: () => void;
 	loadGame: () => boolean;
 }
@@ -51,6 +55,7 @@ export const useGameStore = create<GameState>()(
 		gameOver: false,
 		isGameWon: false,
 		isLoading: false,
+		viewState: "home" as ViewState,
 		possibleMoves: 0,
 		startTime: null,
 		elapsedTime: 0,
@@ -128,6 +133,7 @@ export const useGameStore = create<GameState>()(
 
 			set({
 				isLoading: true,
+				viewState: "loading",
 				startTime: null,
 				elapsedTime: 0,
 				timerIntervalId: null,
@@ -148,6 +154,7 @@ export const useGameStore = create<GameState>()(
 					tiles: newTiles,
 					grid: newGrid,
 					isLoading: false,
+					viewState: "playing",
 				});
 
 				queueMicrotask(() => get().updatePossibleMoves());
@@ -172,6 +179,7 @@ export const useGameStore = create<GameState>()(
 
 			set({
 				isLoading: true,
+				viewState: "loading",
 				startTime: null,
 				elapsedTime: 0,
 				timerIntervalId: null,
@@ -196,6 +204,7 @@ export const useGameStore = create<GameState>()(
 					tiles: newTiles,
 					grid: newGrid,
 					isLoading: false,
+					viewState: "playing",
 				});
 
 				queueMicrotask(() => get().updatePossibleMoves());
@@ -216,7 +225,12 @@ export const useGameStore = create<GameState>()(
 
 			if (activeTiles.length === 0) {
 				get().stopTimer();
-				set({ gameOver: true, isGameWon: true, possibleMoves: 0 });
+				set({
+					gameOver: true,
+					isGameWon: true,
+					possibleMoves: 0,
+					viewState: "gameOver",
+				});
 
 				// Record completion in daily mode
 				if (state.isDailyMode) {
@@ -229,7 +243,12 @@ export const useGameStore = create<GameState>()(
 
 			if (moves.length === 0) {
 				get().stopTimer();
-				set({ gameOver: true, isGameWon: false, possibleMoves: 0 });
+				set({
+					gameOver: true,
+					isGameWon: false,
+					possibleMoves: 0,
+					viewState: "gameOver",
+				});
 			} else {
 				set({ possibleMoves: moves.length });
 			}
@@ -283,6 +302,30 @@ export const useGameStore = create<GameState>()(
 				});
 				queueMicrotask(() => get().updatePossibleMoves());
 			}
+		},
+
+		goHome: () => {
+			const state = get();
+
+			if (state.timerIntervalId) {
+				clearInterval(state.timerIntervalId);
+			}
+
+			set({
+				tiles: [],
+				grid: new Map(),
+				selectedTile: null,
+				gameOver: false,
+				isGameWon: false,
+				isLoading: false,
+				viewState: "home",
+				possibleMoves: 0,
+				startTime: null,
+				elapsedTime: 0,
+				timerIntervalId: null,
+				previousTiles: null,
+				previousGrid: null,
+			});
 		},
 
 		saveGame: () => {

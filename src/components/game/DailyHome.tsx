@@ -40,9 +40,12 @@ export const DailyHome = memo(function DailyHome({
 	};
 
 	return (
-		<div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-auto">
+		<div
+			className="h-screen w-screen overflow-auto"
+			style={{ backgroundColor: "#3a4a5a" }}
+		>
 			<div className="min-h-full w-full flex flex-col items-center justify-center p-4 gap-8">
-				<div className="text-white flex flex-col items-center gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+				<div className="text-white flex flex-col items-center gap-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
 					<h1 className="text-5xl font-bold bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent">
 						Fast Mahjong
 					</h1>
@@ -51,11 +54,11 @@ export const DailyHome = memo(function DailyHome({
 					</p>
 				</div>
 
-				<div className="w-48 h-48 animate-in fade-in duration-700 delay-100">
+				<div className="w-48 h-48 animate-in fade-in duration-300 delay-75">
 					<SplashTile />
 				</div>
 
-				<Card className="w-full max-w-md bg-slate-800/90 text-white shadow-xl backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2 duration-500 delay-200">
+				<Card className="w-full max-w-md bg-slate-800/90 text-white shadow-xl backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2 duration-300 delay-100">
 					<CardContent className="pt-6">
 						<div className="flex items-center justify-between mb-4">
 							<div className="flex items-center gap-2">
@@ -114,20 +117,20 @@ export const DailyHome = memo(function DailyHome({
 					</CardContent>
 				</Card>
 
-				<div className="animate-in fade-in duration-500 delay-300">
+				<div className="animate-in fade-in duration-300 delay-150">
 					<DailyStats />
 				</div>
 
 				<Button
 					variant="outline"
-					className="bg-slate-700/50 hover:bg-slate-600/50 text-white border-slate-600 transition-all animate-in fade-in duration-500 delay-400"
+					className="bg-slate-700/50 hover:bg-slate-600/50 text-white border-slate-600 transition-all animate-in fade-in duration-300 delay-200"
 					onClick={onStartRandom}
 				>
 					<Shuffle className="mr-2 h-4 w-4" />
 					Play Random Puzzle
 				</Button>
 
-				<div className="text-slate-500 text-xs animate-in fade-in duration-500 delay-500">
+				<div className="text-slate-500 text-xs animate-in fade-in duration-300 delay-200">
 					New puzzle every day at midnight
 				</div>
 			</div>

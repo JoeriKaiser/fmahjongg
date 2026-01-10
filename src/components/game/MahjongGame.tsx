@@ -150,8 +150,11 @@ const GameOverScreen = memo(function GameOverScreen({
 	};
 
 	return (
-		<div className="h-screen w-screen bg-gradient-to-b from-slate-900 to-slate-800 flex items-center justify-center">
-			<div className="text-white flex flex-col items-center gap-6 animate-in fade-in zoom-in-95 duration-300">
+		<div
+			className="h-screen w-screen flex items-center justify-center"
+			style={{ backgroundColor: "#3a4a5a" }}
+		>
+			<div className="text-white flex flex-col items-center gap-6 animate-in fade-in zoom-in-95 duration-200">
 				<div className={`text-6xl ${isWon ? "animate-bounce" : ""}`}>
 					{isWon ? "🎉" : "😔"}
 				</div>
@@ -285,17 +288,15 @@ const GameScene = memo(function GameScene() {
 
 			<TileInstances />
 
+			{/* Shadow-receiving floor plane - uses shadowMaterial to be invisible
+			    but still catch shadows, so background matches CSS exactly */}
 			<mesh
 				rotation={[-Math.PI / 2, 0, 0]}
 				position={[0, -0.5, 0]}
 				receiveShadow
 			>
 				<planeGeometry args={[100, 100]} />
-				<meshStandardMaterial
-					color={SCENE_BG_COLOR}
-					roughness={0.9}
-					metalness={0.1}
-				/>
+				<shadowMaterial opacity={0.3} />
 			</mesh>
 		</>
 	);
@@ -303,11 +304,8 @@ const GameScene = memo(function GameScene() {
 
 export function MahjongGame() {
 	const [showScoreSubmission, setShowScoreSubmission] = useState(false);
-	const [showHome, setShowHome] = useState(true);
 
-	const tiles = useGameStore((s) => s.tiles);
-	const isLoading = useGameStore((s) => s.isLoading);
-	const gameOver = useGameStore((s) => s.gameOver);
+	const viewState = useGameStore((s) => s.viewState);
 	const isGameWon = useGameStore((s) => s.isGameWon);
 	const elapsedTime = useGameStore((s) => s.elapsedTime);
 	const possibleMoves = useGameStore((s) => s.possibleMoves);
@@ -315,26 +313,13 @@ export function MahjongGame() {
 	const puzzleNumber = useGameStore((s) => s.puzzleNumber);
 	const resetGame = useGameStore((s) => s.resetGame);
 	const startDailyPuzzle = useGameStore((s) => s.startDailyPuzzle);
+	const goHome = useGameStore((s) => s.goHome);
 	const undo = useGameStore((s) => s.undo);
-
-	const handleStartDaily = useCallback(() => {
-		setShowHome(false);
-		startDailyPuzzle();
-	}, [startDailyPuzzle]);
-
-	const handleStartRandom = useCallback(() => {
-		setShowHome(false);
-		resetGame();
-	}, [resetGame]);
-
-	const handleHome = useCallback(() => {
-		setShowHome(true);
-	}, []);
 
 	const handleScoreSubmitted = useCallback(() => {
 		setShowScoreSubmission(false);
-		setShowHome(true);
-	}, []);
+		goHome();
+	}, [goHome]);
 
 	const handleSubmitScore = useCallback(() => {
 		setShowScoreSubmission(true);
@@ -350,10 +335,10 @@ export function MahjongGame() {
 
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
-			if (e.key === " " && !showHome) {
+			if (e.key === " " && viewState === "playing") {
 				e.preventDefault();
 				handleResetGame();
-			} else if (e.ctrlKey && e.key === "z" && !showHome) {
+			} else if (e.ctrlKey && e.key === "z" && viewState === "playing") {
 				e.preventDefault();
 				undo();
 			}
@@ -361,28 +346,28 @@ export function MahjongGame() {
 
 		window.addEventListener("keydown", handleKeyDown);
 		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [handleResetGame, undo, showHome]);
+	}, [handleResetGame, undo, viewState]);
 
-	if (showHome && !tiles.length) {
+	if (viewState === "home") {
 		return (
 			<DailyHome
-				onStartDaily={handleStartDaily}
-				onStartRandom={handleStartRandom}
+				onStartDaily={startDailyPuzzle}
+				onStartRandom={resetGame}
 			/>
 		);
 	}
 
-	if (isLoading) {
+	if (viewState === "loading") {
 		return <LoadingScreen />;
 	}
 
-	if (gameOver) {
+	if (viewState === "gameOver") {
 		return (
 			<>
 				<GameOverScreen
 					isWon={isGameWon}
 					onReset={handleResetGame}
-					onHome={handleHome}
+					onHome={goHome}
 					onSubmitScore={handleSubmitScore}
 					isDailyMode={isDailyMode}
 				/>
@@ -406,7 +391,7 @@ export function MahjongGame() {
 					possibleMoves={possibleMoves}
 					elapsedTime={elapsedTime}
 					onReset={handleResetGame}
-					onHome={handleHome}
+					onHome={goHome}
 					isDailyMode={isDailyMode}
 					puzzleNumber={puzzleNumber}
 				/>
