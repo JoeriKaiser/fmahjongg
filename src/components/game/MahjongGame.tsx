@@ -350,10 +350,7 @@ export function MahjongGame() {
 
 	if (viewState === "home") {
 		return (
-			<DailyHome
-				onStartDaily={startDailyPuzzle}
-				onStartRandom={resetGame}
-			/>
+			<DailyHome onStartDaily={startDailyPuzzle} onStartRandom={resetGame} />
 		);
 	}
 
