@@ -9,15 +9,15 @@ export const DailyStats = memo(function DailyStats() {
 	const statItems = [
 		{
 			icon: Flame,
-			label: "Current Streak",
+			label: "Current streak",
 			value: stats.currentStreak,
 			color: "text-orange-400",
 		},
 		{
 			icon: Trophy,
-			label: "Max Streak",
+			label: "Max streak",
 			value: stats.maxStreak,
-			color: "text-yellow-400",
+			color: "text-amber-300",
 		},
 		{
 			icon: Calendar,
@@ -28,17 +28,19 @@ export const DailyStats = memo(function DailyStats() {
 	];
 
 	return (
-		<Card className="w-full max-w-md bg-slate-800/90 text-white shadow-xl backdrop-blur-sm">
+		<Card className="w-full max-w-md">
 			<CardHeader className="pb-3">
-				<CardTitle className="text-lg font-bold">Your Stats</CardTitle>
+				<CardTitle>Daily stats</CardTitle>
 			</CardHeader>
 			<CardContent>
 				<div className="grid grid-cols-3 gap-4">
 					{statItems.map(({ icon: Icon, label, value, color }) => (
-						<div key={label} className="flex flex-col items-center gap-2">
-							<Icon className={`h-6 w-6 ${color}`} />
-							<div className="text-2xl font-bold font-mono">{value}</div>
-							<div className="text-xs text-slate-400 text-center">{label}</div>
+						<div key={label} className="flex flex-col items-center gap-1.5">
+							<Icon className={`h-5 w-5 ${color}`} aria-hidden="true" />
+							<div className="text-2xl font-bold font-mono tabular-nums">
+								{value}
+							</div>
+							<div className="text-xs text-slate-300 text-center">{label}</div>
 						</div>
 					))}
 				</div>

@@ -1,89 +1,68 @@
-import { invoke } from "@tauri-apps/api/core";
 import { Trophy } from "lucide-react";
-import { memo, useCallback, useEffect, useState } from "react";
+import { memo, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { getBestTimes, type LocalScore } from "@/utils/localScores";
 
-interface Score {
-	id: number;
-	name: string;
-	time: number;
-	timestamp: number;
+const DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
+	month: "short",
+	day: "numeric",
+});
+
+function formatTime(seconds: number): string {
+	const mins = Math.floor(seconds / 60);
+	const secs = seconds % 60;
+	return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
 const ScoreRow = memo(function ScoreRow({
 	score,
 	index,
 }: {
-	score: Score;
+	score: LocalScore;
 	index: number;
 }) {
-	const formatTime = (seconds: number) => {
-		const mins = Math.floor(seconds / 60);
-		const secs = seconds % 60;
-		return `${mins}:${secs.toString().padStart(2, "0")}`;
-	};
-
-	const medalColors = ["text-yellow-400", "text-slate-300", "text-amber-600"];
-	const medalColor = medalColors[index] || "text-slate-500";
+	const formattedDate = DATE_FORMATTER.format(new Date(score.completedAt));
+	const medalColors = ["text-amber-300", "text-slate-200", "text-amber-500"];
+	const medalColor = medalColors[index] || "text-slate-400";
 
 	return (
-		<div className="flex justify-between items-center text-sm py-1">
+		<li className="flex justify-between items-center text-sm py-1">
 			<div className="flex items-center gap-2">
-				<span className={`font-bold ${medalColor}`}>{index + 1}.</span>
-				<span className="truncate max-w-[120px]">{score.name}</span>
+				<span className={`font-bold tabular-nums ${medalColor}`}>
+					{index + 1}.
+				</span>
+				<span className="text-slate-300 text-xs">{formattedDate}</span>
 			</div>
-			<span className="font-mono text-emerald-400">
+			<span className="font-mono tabular-nums text-emerald-400">
 				{formatTime(score.time)}
 			</span>
-		</div>
+		</li>
 	);
 });
 
 export const TopScores = memo(function TopScores() {
-	const [scores, setScores] = useState<Score[]>([]);
-	const [isLoading, setIsLoading] = useState(true);
-
-	const fetchScores = useCallback(async () => {
-		try {
-			const topScores = await invoke<Score[]>("get_top_scores", { limit: 5 });
-			setScores(topScores);
-		} catch (error) {
-			console.error("Failed to fetch scores:", error);
-		} finally {
-			setIsLoading(false);
-		}
-	}, []);
-
-	useEffect(() => {
-		fetchScores();
-	}, [fetchScores]);
+	const scores = useMemo(() => getBestTimes(5), []);
 
 	return (
-		<Card className="w-64 bg-slate-800/90 text-white shadow-xl backdrop-blur-sm">
+		<Card className="w-64">
 			<CardHeader className="pb-2">
-				<CardTitle className="text-lg font-bold flex items-center gap-2">
-					<Trophy className="h-5 w-5 text-yellow-400" />
-					Top Scores
+				<CardTitle className="flex items-center gap-2">
+					<Trophy className="h-5 w-5 text-amber-300" aria-hidden="true" />
+					Best times
 				</CardTitle>
 			</CardHeader>
 			<CardContent>
-				{isLoading ? (
-					<div className="space-y-2">
-						{[...Array(5)].map((_, i) => (
-							<Skeleton key={i + _} className="h-6 w-full bg-slate-700" />
-						))}
-					</div>
-				) : scores.length === 0 ? (
-					<p className="text-sm text-slate-400 text-center py-4">
-						No scores yet. Be the first!
+				{scores.length === 0 ? (
+					<p className="text-sm text-slate-300 text-start text-pretty py-2 leading-relaxed">
+						No best times yet. Finish a random board to record your fastest
+						runs.
 					</p>
 				) : (
-					<div className="space-y-1">
+					<ol className="space-y-1">
 						{scores.map((score, index) => (
 							<ScoreRow key={score.id} score={score} index={index} />
 						))}
-					</div>
+					</ol>
 				)}
 			</CardContent>
 		</Card>

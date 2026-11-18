@@ -3,7 +3,7 @@ import { MahjongGame } from "@/components/game/MahjongGame";
 
 function App() {
 	return (
-		<main className="container">
+		<main className="w-full min-h-dvh">
 			<MahjongGame />
 		</main>
 	);
