@@ -1,51 +1,83 @@
 import type { SeededRandom } from "@/utils/seededRandom";
 import {
-	ALL_SYMBOLS,
-	CENTER_OFFSET,
 	MAX_GENERATION_ATTEMPTS,
+	REGULAR_SYMBOLS,
 	SPACING,
+	TILE_SYMBOLS,
 } from "../constants";
+import {
+	createGridKey,
+	createTileGrid,
+	isTileAccessible,
+} from "../grid/gridUtils";
 import type { TileData } from "../types";
-import { isLayoutSolvable } from "../validation/solvability";
-import { countTotalTiles, LAYER_LAYOUTS } from "./layouts";
+import { LAYER_LAYOUTS } from "./layouts";
 
-/**
- * Fisher-Yates shuffle - modifies array in place
- */
+function nextInt(max: number, rng?: SeededRandom): number {
+	return rng ? rng.nextInt(0, max) : Math.floor(Math.random() * max);
+}
+
 function shuffle<T>(arr: T[], rng?: SeededRandom): T[] {
 	for (let i = arr.length - 1; i > 0; i--) {
-		const j = rng ? rng.nextInt(0, i + 1) : Math.floor(Math.random() * (i + 1));
+		const j = nextInt(i + 1, rng);
 		[arr[i], arr[j]] = [arr[j], arr[i]];
 	}
 	return arr;
 }
 
-function generateDeck(totalTiles: number, rng?: SeededRandom): string[] {
+export function generatePairs(
+	totalTiles: number,
+	rng?: SeededRandom,
+): Array<[string, string]> {
 	if (totalTiles % 2 !== 0) {
 		throw new Error("Total tiles must be even for pairing");
 	}
 
-	const deck: string[] = [];
+	const neededPairs = totalTiles / 2;
+	const standardPairs: Array<[string, string]> = [];
 
-	const symbols = shuffle([...ALL_SYMBOLS], rng);
-	let symbolIndex = 0;
-
-	while (deck.length < totalTiles) {
-		const symbol = symbols[symbolIndex % symbols.length];
-		deck.push(symbol, symbol);
-		symbolIndex++;
+	for (const symbol of REGULAR_SYMBOLS) {
+		standardPairs.push([symbol, symbol], [symbol, symbol]);
 	}
 
-	return shuffle(deck, rng);
+	const seasons = shuffle([...TILE_SYMBOLS.seasons], rng);
+	standardPairs.push([seasons[0], seasons[1]], [seasons[2], seasons[3]]);
+
+	const flowers = shuffle([...TILE_SYMBOLS.flowers], rng);
+	standardPairs.push([flowers[0], flowers[1]], [flowers[2], flowers[3]]);
+
+	if (neededPairs <= standardPairs.length) {
+		return shuffle(standardPairs, rng).slice(0, neededPairs);
+	}
+
+	const pairs: Array<[string, string]> = [];
+	while (pairs.length < neededPairs) {
+		const batch = shuffle([...standardPairs], rng);
+		for (const pair of batch) {
+			if (pairs.length >= neededPairs) break;
+			pairs.push(pair);
+		}
+	}
+	return pairs;
 }
 
-function createTilesFromLayout(deck: string[]): TileData[] {
-	const tiles: TileData[] = [];
-	let deckIndex = 0;
+export function createLayoutSlots(
+	layerLayouts: number[][][] = LAYER_LAYOUTS,
+): TileData[] {
+	const rawSlots: Array<{
+		id: string;
+		gx: number;
+		gy: number;
+		gz: number;
+	}> = [];
 	let tileId = 0;
+	let minGx = Number.POSITIVE_INFINITY;
+	let maxGx = Number.NEGATIVE_INFINITY;
+	let minGz = Number.POSITIVE_INFINITY;
+	let maxGz = Number.NEGATIVE_INFINITY;
 
-	for (let layerIndex = 0; layerIndex < LAYER_LAYOUTS.length; layerIndex++) {
-		const layer = LAYER_LAYOUTS[layerIndex];
+	for (let layerIndex = 0; layerIndex < layerLayouts.length; layerIndex++) {
+		const layer = layerLayouts[layerIndex];
 
 		for (let rowIndex = 0; rowIndex < layer.length; rowIndex++) {
 			const row = layer[rowIndex];
@@ -54,54 +86,159 @@ function createTilesFromLayout(deck: string[]): TileData[] {
 				const tileType = row[colIndex];
 
 				if (tileType >= 1 && tileType <= 3) {
-					const symbol = deck[deckIndex++];
+					const gx = colIndex * 2 + (tileType === 3 ? 1 : 0);
+					const gz = rowIndex * 2 + (tileType >= 2 ? 1 : 0);
 
-					const xOffset = tileType === 3 ? 0.5 : 0;
-					const zOffset = tileType >= 2 ? 0.5 : 0;
+					if (gx < minGx) minGx = gx;
+					if (gx > maxGx) maxGx = gx;
+					if (gz < minGz) minGz = gz;
+					if (gz > maxGz) maxGz = gz;
 
-					tiles.push({
-						id: `tile-${tileId++}-L${layerIndex}${tileType > 1 ? "-split" : ""}`,
-						symbol,
-						position: {
-							x: (colIndex + xOffset) * SPACING.X + CENTER_OFFSET.X,
-							y: layerIndex * SPACING.Y,
-							z: (rowIndex + zOffset) * SPACING.Z + CENTER_OFFSET.Z,
-						},
-						gridPosition: {
-							x: colIndex,
-							y: layerIndex,
-							z: rowIndex,
-						},
-						layer: layerIndex,
-						isSelected: false,
-						isRemoved: false,
-						isAccessible: true,
+					rawSlots.push({
+						id: `tile-${tileId++}-L${layerIndex}`,
+						gx,
+						gy: layerIndex,
+						gz,
 					});
 				}
 			}
 		}
 	}
 
-	return tiles;
+	if (rawSlots.length === 0) return [];
+
+	const centerGx = (minGx + maxGx) / 2;
+	const centerGz = (minGz + maxGz) / 2;
+
+	return rawSlots.map(({ id, gx, gy, gz }) => ({
+		id,
+		symbol: "",
+		position: {
+			x: ((gx - centerGx) / 2) * SPACING.X,
+			y: gy * SPACING.Y,
+			z: ((gz - centerGz) / 2) * SPACING.Z,
+		},
+		gridPosition: {
+			x: gx,
+			y: gy,
+			z: gz,
+		},
+		layer: gy,
+		isRemoved: false,
+		isAccessible: false,
+	}));
 }
 
-export function generateInitialLayout(rng?: SeededRandom): TileData[] {
-	const totalTiles = countTotalTiles();
+function peelLayout(
+	slots: TileData[],
+	rng?: SeededRandom,
+): Array<[number, number]> | null {
+	const workingGrid = createTileGrid(slots);
+	const activeIndices = slots.map((_, index) => index);
+	const peelOrder: Array<[number, number]> = [];
 
-	for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS; attempt++) {
-		try {
-			const deck = generateDeck(totalTiles, rng);
-			const tiles = createTilesFromLayout(deck);
+	while (activeIndices.length > 0) {
+		const freePositions: number[] = [];
 
-			if (isLayoutSolvable(tiles)) {
-				return tiles.map((t) => ({ ...t, isRemoved: false }));
+		for (let i = 0; i < activeIndices.length; i++) {
+			const slot = slots[activeIndices[i]];
+			if (isTileAccessible(slot, workingGrid)) {
+				freePositions.push(i);
 			}
-		} catch (error) {
-			console.warn(`Generation attempt ${attempt + 1} failed:`, error);
 		}
+
+		if (freePositions.length < 2) {
+			return null;
+		}
+
+		const firstPick = nextInt(freePositions.length, rng);
+		const firstActivePos = freePositions[firstPick];
+		freePositions[firstPick] = freePositions[freePositions.length - 1];
+		freePositions.pop();
+
+		const secondPick = nextInt(freePositions.length, rng);
+		const secondActivePos = freePositions[secondPick];
+
+		const slotIdxA = activeIndices[firstActivePos];
+		const slotIdxB = activeIndices[secondActivePos];
+
+		const slotA = slots[slotIdxA];
+		const slotB = slots[slotIdxB];
+
+		workingGrid.delete(
+			createGridKey(
+				slotA.gridPosition.x,
+				slotA.gridPosition.y,
+				slotA.gridPosition.z,
+			),
+		);
+		workingGrid.delete(
+			createGridKey(
+				slotB.gridPosition.x,
+				slotB.gridPosition.y,
+				slotB.gridPosition.z,
+			),
+		);
+
+		const highPos = Math.max(firstActivePos, secondActivePos);
+		const lowPos = Math.min(firstActivePos, secondActivePos);
+		activeIndices[highPos] = activeIndices[activeIndices.length - 1];
+		activeIndices.pop();
+		activeIndices[lowPos] = activeIndices[activeIndices.length - 1];
+		activeIndices.pop();
+
+		peelOrder.push([slotIdxA, slotIdxB]);
 	}
 
-	console.warn("Could not generate solvable layout, using fallback");
-	const deck = generateDeck(totalTiles, rng);
-	return createTilesFromLayout(deck);
+	return peelOrder;
+}
+
+export interface GeneratedLayout {
+	tiles: TileData[];
+	solution: Array<[string, string]>;
+}
+
+export function generateSolvableLayout(
+	rng?: SeededRandom,
+	layerLayouts: number[][][] = LAYER_LAYOUTS,
+): GeneratedLayout {
+	const slots = createLayoutSlots(layerLayouts);
+	if (slots.length % 2 !== 0) {
+		throw new Error("Layout must contain an even number of tiles");
+	}
+
+	for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS; attempt++) {
+		const peelOrder = peelLayout(slots, rng);
+		if (!peelOrder) continue;
+
+		const pairs = generatePairs(slots.length, rng);
+		const tiles = slots.map((slot) => ({ ...slot }));
+		const solution: Array<[string, string]> = [];
+
+		for (let i = 0; i < peelOrder.length; i++) {
+			const [idxA, idxB] = peelOrder[i];
+			const [symA, symB] = pairs[i];
+			tiles[idxA].symbol = symA;
+			tiles[idxB].symbol = symB;
+			solution.push([tiles[idxA].id, tiles[idxB].id]);
+		}
+
+		const grid = createTileGrid(tiles);
+		for (const tile of tiles) {
+			tile.isAccessible = isTileAccessible(tile, grid);
+		}
+
+		return { tiles, solution };
+	}
+
+	throw new Error(
+		`Failed to generate solvable layout after ${MAX_GENERATION_ATTEMPTS} attempts`,
+	);
+}
+
+export function generateInitialLayout(
+	rng?: SeededRandom,
+	layerLayouts: number[][][] = LAYER_LAYOUTS,
+): TileData[] {
+	return generateSolvableLayout(rng, layerLayouts).tiles;
 }

@@ -4,7 +4,7 @@ export interface DailyStats {
 	totalCompleted: number;
 	currentStreak: number;
 	maxStreak: number;
-	completedDates: string[]; // Array of YYYY-MM-DD strings
+	completedDates: string[];
 	lastPlayedDate: string | null;
 }
 
@@ -12,64 +12,61 @@ export interface DailyPuzzleCompletion {
 	date: string;
 	puzzleNumber: number;
 	time: number;
-	completedAt: number; // timestamp
+	completedAt: number;
 }
 
 const STATS_KEY = "fmahjongg-daily-stats";
 const COMPLETION_KEY = "fmahjongg-daily-completions";
+const MS_PER_DAY = 86_400_000;
 
-/**
- * Get user's daily puzzle statistics
- */
-export function getDailyStats(): DailyStats {
-	const stored = localStorage.getItem(STATS_KEY);
-	if (!stored) {
-		return {
-			totalCompleted: 0,
-			currentStreak: 0,
-			maxStreak: 0,
-			completedDates: [],
-			lastPlayedDate: null,
-		};
-	}
-	return JSON.parse(stored);
+function dateStringToDayIndex(dateStr: string): number {
+	const [year, month, day] = dateStr.split("-").map(Number);
+	return Math.floor(Date.UTC(year, month - 1, day) / MS_PER_DAY);
 }
 
-/**
- * Save daily puzzle statistics
- */
+const DEFAULT_STATS: DailyStats = {
+	totalCompleted: 0,
+	currentStreak: 0,
+	maxStreak: 0,
+	completedDates: [],
+	lastPlayedDate: null,
+};
+
+export function getDailyStats(): DailyStats {
+	try {
+		const stored = localStorage.getItem(STATS_KEY);
+		if (!stored) return { ...DEFAULT_STATS, completedDates: [] };
+		return JSON.parse(stored) as DailyStats;
+	} catch {
+		return { ...DEFAULT_STATS, completedDates: [] };
+	}
+}
+
 export function saveDailyStats(stats: DailyStats): void {
 	localStorage.setItem(STATS_KEY, JSON.stringify(stats));
 }
 
-/**
- * Get all completions
- */
 export function getCompletions(): DailyPuzzleCompletion[] {
-	const stored = localStorage.getItem(COMPLETION_KEY);
-	if (!stored) return [];
-	return JSON.parse(stored);
+	try {
+		const stored = localStorage.getItem(COMPLETION_KEY);
+		if (!stored) return [];
+		const parsed = JSON.parse(stored) as DailyPuzzleCompletion[];
+		return Array.isArray(parsed) ? parsed : [];
+	} catch {
+		return [];
+	}
 }
 
-/**
- * Save completions
- */
 export function saveCompletions(completions: DailyPuzzleCompletion[]): void {
 	localStorage.setItem(COMPLETION_KEY, JSON.stringify(completions));
 }
 
-/**
- * Check if today's puzzle is completed
- */
 export function isTodayCompleted(): boolean {
 	const today = getDateString();
 	const stats = getDailyStats();
 	return stats.completedDates.includes(today);
 }
 
-/**
- * Get completion for specific date
- */
 export function getCompletionForDate(
 	date: string,
 ): DailyPuzzleCompletion | null {
@@ -77,10 +74,10 @@ export function getCompletionForDate(
 	return completions.find((c) => c.date === date) || null;
 }
 
-/**
- * Calculate streak from completed dates
- */
-function calculateStreak(completedDates: string[]): {
+export function calculateStreak(
+	completedDates: string[],
+	todayDate: Date = new Date(),
+): {
 	current: number;
 	max: number;
 } {
@@ -88,70 +85,49 @@ function calculateStreak(completedDates: string[]): {
 		return { current: 0, max: 0 };
 	}
 
-	// Sort dates in descending order
-	const sorted = [...completedDates].sort((a, b) => b.localeCompare(a));
+	const uniqueDays = Array.from(
+		new Set(completedDates.map(dateStringToDayIndex)),
+	).sort((a, b) => b - a);
+
+	const todayDay = dateStringToDayIndex(getDateString(todayDate));
+	const yesterdayDay = todayDay - 1;
 
 	let currentStreak = 0;
-	let maxStreak = 0;
-	let streakCount = 0;
-
-	const today = getDateString();
-	const yesterday = getDateString(new Date(Date.now() - 24 * 60 * 60 * 1000));
-
-	// Check if streak is alive (today or yesterday completed)
-	if (sorted[0] === today || sorted[0] === yesterday) {
-		streakCount = 1;
-
-		// Count consecutive days
-		for (let i = 1; i < sorted.length; i++) {
-			const currentDate = new Date(sorted[i - 1]);
-			const prevDate = new Date(sorted[i]);
-			const diffTime = currentDate.getTime() - prevDate.getTime();
-			const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-			if (diffDays === 1) {
-				streakCount++;
+	if (uniqueDays[0] === todayDay || uniqueDays[0] === yesterdayDay) {
+		currentStreak = 1;
+		for (let i = 1; i < uniqueDays.length; i++) {
+			if (uniqueDays[i - 1] - uniqueDays[i] === 1) {
+				currentStreak++;
 			} else {
 				break;
 			}
 		}
-		currentStreak = streakCount;
 	}
 
-	// Calculate max streak
-	streakCount = 1;
-	for (let i = 1; i < sorted.length; i++) {
-		const currentDate = new Date(sorted[i - 1]);
-		const prevDate = new Date(sorted[i]);
-		const diffTime = currentDate.getTime() - prevDate.getTime();
-		const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-		if (diffDays === 1) {
-			streakCount++;
-			maxStreak = Math.max(maxStreak, streakCount);
+	let maxStreak = 1;
+	let runLength = 1;
+	for (let i = 1; i < uniqueDays.length; i++) {
+		if (uniqueDays[i - 1] - uniqueDays[i] === 1) {
+			runLength++;
+			if (runLength > maxStreak) {
+				maxStreak = runLength;
+			}
 		} else {
-			streakCount = 1;
+			runLength = 1;
 		}
 	}
 
-	maxStreak = Math.max(maxStreak, currentStreak, 1);
-
-	return { current: currentStreak, max: maxStreak };
+	return { current: currentStreak, max: Math.max(maxStreak, currentStreak) };
 }
 
-/**
- * Record puzzle completion
- */
 export function recordCompletion(time: number): void {
 	const today = getDateString();
 	const puzzleNumber = getPuzzleNumber();
 
-	// Don't record if already completed today
 	if (isTodayCompleted()) {
 		return;
 	}
 
-	// Add new completion
 	const completions = getCompletions();
 	completions.push({
 		date: today,
@@ -161,7 +137,6 @@ export function recordCompletion(time: number): void {
 	});
 	saveCompletions(completions);
 
-	// Update stats
 	const stats = getDailyStats();
 	stats.completedDates.push(today);
 	stats.totalCompleted++;
@@ -174,18 +149,12 @@ export function recordCompletion(time: number): void {
 	saveDailyStats(stats);
 }
 
-/**
- * Get today's completion time (if completed)
- */
 export function getTodayCompletionTime(): number | null {
 	const today = getDateString();
 	const completion = getCompletionForDate(today);
-	return completion?.time || null;
+	return completion?.time ?? null;
 }
 
-/**
- * Generate share text for today's puzzle
- */
 export function generateShareText(): string {
 	const today = getDateString();
 	const completion = getCompletionForDate(today);
@@ -200,13 +169,16 @@ export function generateShareText(): string {
 	const timeStr = `${mins}:${secs.toString().padStart(2, "0")}`;
 
 	const stats = getDailyStats();
+	const url =
+		typeof window !== "undefined" && window.location?.origin
+			? window.location.origin
+			: "";
 
-	return `Fast Mahjong #${puzzleNumber}\n⏱️ ${timeStr}\n🔥 ${stats.currentStreak} day streak\n\nPlay at: [Your URL Here]`;
+	const urlLine = url ? `\n\nPlay at: ${url}` : "";
+
+	return `Fast Mahjong #${puzzleNumber}\n⏱️ ${timeStr}\n🔥 ${stats.currentStreak} day streak${urlLine}`;
 }
 
-/**
- * Copy share text to clipboard
- */
 export async function shareToClipboard(): Promise<boolean> {
 	try {
 		const shareText = generateShareText();

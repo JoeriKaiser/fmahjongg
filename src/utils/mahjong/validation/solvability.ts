@@ -1,18 +1,45 @@
 import { createGridKey, createTileGrid } from "../grid/gridUtils";
-import { findMatchableTiles } from "../matching/matcher";
+import { canMatch, findMatchableTiles } from "../matching/matcher";
 import type { TileData } from "../types";
+
+export function verifySolution(
+	tiles: TileData[],
+	moves: Array<[string, string]>,
+): boolean {
+	const workingTiles = tiles.map((t) => ({ ...t, isRemoved: false }));
+	const byId = new Map(workingTiles.map((t) => [t.id, t]));
+	const grid = createTileGrid(workingTiles);
+
+	for (const [id1, id2] of moves) {
+		const t1 = byId.get(id1);
+		const t2 = byId.get(id2);
+		if (!t1 || !t2) return false;
+		if (!canMatch(t1, t2, grid)) return false;
+
+		t1.isRemoved = true;
+		t2.isRemoved = true;
+		grid.delete(
+			createGridKey(t1.gridPosition.x, t1.gridPosition.y, t1.gridPosition.z),
+		);
+		grid.delete(
+			createGridKey(t2.gridPosition.x, t2.gridPosition.y, t2.gridPosition.z),
+		);
+	}
+
+	return workingTiles.every((t) => t.isRemoved);
+}
 
 export function isLayoutSolvable(tiles: TileData[]): boolean {
 	const workingTiles = tiles.map((t) => ({ ...t }));
 	const grid = createTileGrid(workingTiles);
 
-	let remaining = workingTiles.length;
+	let remaining = workingTiles.filter((t) => !t.isRemoved).length;
 
 	while (remaining > 0) {
 		const matches = findMatchableTiles(workingTiles, grid);
 
 		if (matches.length === 0) {
-			return remaining === 0;
+			return false;
 		}
 
 		let bestMatch = matches[0];

@@ -40,12 +40,16 @@ export const TILE_SYMBOLS = {
 	flowers: ["Bamboo1", "Bamboo2", "Bamboo3", "Bamboo4"],
 } as const;
 
-export const ALL_SYMBOLS: string[] = [
+export const REGULAR_SYMBOLS: readonly string[] = [
 	...TILE_SYMBOLS.suits.man,
 	...TILE_SYMBOLS.suits.pin,
 	...TILE_SYMBOLS.suits.sou,
 	...TILE_SYMBOLS.winds,
 	...TILE_SYMBOLS.dragons,
+];
+
+export const ALL_SYMBOLS: readonly string[] = [
+	...REGULAR_SYMBOLS,
 	...TILE_SYMBOLS.seasons,
 	...TILE_SYMBOLS.flowers,
 ];
@@ -56,9 +60,4 @@ export const SPACING = {
 	Z: 1.6,
 } as const;
 
-export const CENTER_OFFSET = {
-	X: -8.4,
-	Z: -5.6,
-} as const;
-
-export const MAX_GENERATION_ATTEMPTS = 20;
+export const MAX_GENERATION_ATTEMPTS = 100;

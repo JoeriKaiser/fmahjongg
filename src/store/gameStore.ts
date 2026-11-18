@@ -1,8 +1,17 @@
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import { recordCompletion } from "@/utils/dailyPuzzle";
-import { createTileGrid } from "@/utils/mahjong/grid/gridUtils";
+import { recordRandomTime } from "@/utils/localScores";
+import {
+	createTileGrid,
+	isTileAccessible,
+} from "@/utils/mahjong/grid/gridUtils";
 import { generateInitialLayout } from "@/utils/mahjong/layout/generator";
+import {
+	getDailyLayout,
+	LAYOUTS,
+	type LayoutId,
+} from "@/utils/mahjong/layout/layouts";
 import { canMatch } from "@/utils/mahjong/matching/matcher";
 import type { TileData, TileGrid } from "@/utils/mahjong/types";
 import { findAvailableMoves } from "@/utils/mahjong/validation/moves";
@@ -12,31 +21,139 @@ import {
 	getPuzzleNumber,
 	SeededRandom,
 } from "@/utils/seededRandom";
+import {
+	getInitialSoundMuted,
+	persistSoundMuted,
+	playBlockedSound,
+	playMatchSound,
+	playSelectSound,
+	playWinSound,
+} from "@/utils/sound";
 
-type ViewState = "home" | "loading" | "playing" | "gameOver";
+type ViewState = "home" | "playing" | "gameOver";
+
+const HIGHLIGHT_STORAGE_KEY = "fmahjongg-highlight-free";
+const ACTIVE_SAVE_KEY = "fmahjongg-active-game";
+const SAVE_SCHEMA_VERSION = 1;
+
+export interface SavedGameSummary {
+	isDailyMode: boolean;
+	layoutId: LayoutId;
+	puzzleDate: string;
+	puzzleNumber: number;
+	remainingTiles: number;
+	elapsedTime: number;
+}
+
+interface SavedGamePayload extends SavedGameSummary {
+	version: number;
+	tiles: TileData[];
+	moveHistory: Array<[string, string]>;
+}
+
+function getInitialHighlightFree(): boolean {
+	try {
+		return localStorage.getItem(HIGHLIGHT_STORAGE_KEY) === "true";
+	} catch {
+		return false;
+	}
+}
+
+function persistHighlightFree(enabled: boolean): void {
+	try {
+		localStorage.setItem(HIGHLIGHT_STORAGE_KEY, String(enabled));
+	} catch {}
+}
+
+function readSavedGame(): SavedGamePayload | null {
+	try {
+		const raw = localStorage.getItem(ACTIVE_SAVE_KEY);
+		if (!raw) return null;
+		const parsed = JSON.parse(raw) as Partial<SavedGamePayload>;
+		if (
+			parsed.version !== SAVE_SCHEMA_VERSION ||
+			!Array.isArray(parsed.tiles) ||
+			parsed.tiles.length === 0 ||
+			!parsed.layoutId ||
+			!(parsed.layoutId in LAYOUTS)
+		) {
+			return null;
+		}
+		if (parsed.isDailyMode && parsed.puzzleDate !== getDateString()) {
+			localStorage.removeItem(ACTIVE_SAVE_KEY);
+			return null;
+		}
+		const remaining = parsed.tiles.filter((t) => !t.isRemoved).length;
+		if (remaining === 0) {
+			localStorage.removeItem(ACTIVE_SAVE_KEY);
+			return null;
+		}
+		return {
+			version: SAVE_SCHEMA_VERSION,
+			isDailyMode: Boolean(parsed.isDailyMode),
+			layoutId: parsed.layoutId,
+			puzzleDate: parsed.puzzleDate ?? getDateString(),
+			puzzleNumber: parsed.puzzleNumber ?? getPuzzleNumber(),
+			remainingTiles: remaining,
+			elapsedTime:
+				typeof parsed.elapsedTime === "number" ? parsed.elapsedTime : 0,
+			tiles: parsed.tiles,
+			moveHistory: Array.isArray(parsed.moveHistory) ? parsed.moveHistory : [],
+		};
+	} catch {
+		return null;
+	}
+}
+
+export function getSavedGameSummary(): SavedGameSummary | null {
+	const saved = readSavedGame();
+	if (!saved) return null;
+	return {
+		isDailyMode: saved.isDailyMode,
+		layoutId: saved.layoutId,
+		puzzleDate: saved.puzzleDate,
+		puzzleNumber: saved.puzzleNumber,
+		remainingTiles: saved.remainingTiles,
+		elapsedTime: saved.elapsedTime,
+	};
+}
+
+export function clearSavedGame(): void {
+	try {
+		localStorage.removeItem(ACTIVE_SAVE_KEY);
+	} catch {}
+}
 
 interface GameState {
 	tiles: TileData[];
 	grid: TileGrid;
-	selectedTile: TileData | null;
+	selectedTileId: string | null;
+	hintPair: [string, string] | null;
 	gameOver: boolean;
 	isGameWon: boolean;
-	isLoading: boolean;
 	viewState: ViewState;
 	possibleMoves: number;
+	remainingTiles: number;
 	startTime: number | null;
 	elapsedTime: number;
 	timerIntervalId: number | null;
-	previousTiles: TileData[] | null;
-	previousGrid: TileGrid | null;
+	moveHistory: Array<[string, string]>;
 	isDailyMode: boolean;
+	layoutId: LayoutId;
+	boardVersion: number;
 	puzzleNumber: number;
 	puzzleDate: string;
+	highlightFreeTiles: boolean;
+	soundMuted: boolean;
 
 	selectTile: (tile: TileData) => void;
-	resetGame: () => void;
-	startDailyPuzzle: () => void;
-	setLoading: (loading: boolean) => void;
+	clearSelection: () => void;
+	showHint: () => void;
+	toggleHighlightFreeTiles: () => void;
+	toggleSoundMuted: () => void;
+	resetGame: (layoutId?: LayoutId) => void;
+	startDailyPuzzle: (forceRestart?: boolean) => void;
+	resumeSavedGame: () => boolean;
 	updatePossibleMoves: () => void;
 	startTimer: () => void;
 	stopTimer: () => void;
@@ -47,194 +164,240 @@ interface GameState {
 	loadGame: () => boolean;
 }
 
+function withAccessibility(tiles: TileData[], grid: TileGrid): TileData[] {
+	return tiles.map((t) => {
+		const accessible = isTileAccessible(t, grid);
+		return t.isAccessible === accessible
+			? t
+			: { ...t, isAccessible: accessible };
+	});
+}
+
 export const useGameStore = create<GameState>()(
 	subscribeWithSelector((set, get) => ({
 		tiles: [],
 		grid: new Map(),
-		selectedTile: null,
+		selectedTileId: null,
+		hintPair: null,
 		gameOver: false,
 		isGameWon: false,
-		isLoading: false,
 		viewState: "home" as ViewState,
 		possibleMoves: 0,
+		remainingTiles: 0,
 		startTime: null,
 		elapsedTime: 0,
 		timerIntervalId: null,
-		previousTiles: null,
-		previousGrid: null,
+		moveHistory: [],
 		isDailyMode: true,
+		layoutId: getDailyLayout(getPuzzleNumber()).id,
+		boardVersion: 0,
 		puzzleNumber: getPuzzleNumber(),
 		puzzleDate: getDateString(),
+		highlightFreeTiles: getInitialHighlightFree(),
+		soundMuted: getInitialSoundMuted(),
 
 		selectTile: (tile) => {
 			const state = get();
 
 			if (tile.isRemoved || state.gameOver) return;
+			if (!isTileAccessible(tile, state.grid)) {
+				playBlockedSound(state.soundMuted);
+				return;
+			}
 
 			if (!state.startTime) {
 				get().startTimer();
 			}
 
-			if (!state.selectedTile) {
-				set({
-					selectedTile: tile,
-					tiles: state.tiles.map((t) => ({
-						...t,
-						isSelected: t.id === tile.id,
-					})),
-				});
+			if (!state.selectedTileId) {
+				playSelectSound(state.soundMuted);
+				set({ selectedTileId: tile.id, hintPair: null });
 				return;
 			}
 
-			if (state.selectedTile.id === tile.id) {
-				set({
-					selectedTile: null,
-					tiles: state.tiles.map((t) => ({ ...t, isSelected: false })),
-				});
+			if (state.selectedTileId === tile.id) {
+				playSelectSound(state.soundMuted);
+				set({ selectedTileId: null, hintPair: null });
 				return;
 			}
 
-			if (canMatch(state.selectedTile, tile, state.grid)) {
-				const updatedTiles = state.tiles.map((t) => ({
-					...t,
-					isSelected: false,
-					isRemoved:
-						t.isRemoved || t.id === tile.id || t.id === state.selectedTile?.id,
-				}));
+			const previousSelected = state.tiles.find(
+				(t) => t.id === state.selectedTileId,
+			);
 
-				const newGrid = createTileGrid(updatedTiles);
+			if (previousSelected && canMatch(previousSelected, tile, state.grid)) {
+				playMatchSound(state.soundMuted);
+				const matchedId1 = previousSelected.id;
+				const matchedId2 = tile.id;
+				const removedTiles = state.tiles.map((t) =>
+					t.id === matchedId1 || t.id === matchedId2
+						? { ...t, isRemoved: true, isAccessible: false }
+						: t,
+				);
+
+				const newGrid = createTileGrid(removedTiles);
+				const updatedTiles = withAccessibility(removedTiles, newGrid);
 
 				set({
-					selectedTile: null,
+					selectedTileId: null,
+					hintPair: null,
 					tiles: updatedTiles,
 					grid: newGrid,
-					previousTiles: state.tiles,
-					previousGrid: state.grid,
+					remainingTiles: newGrid.size,
+					moveHistory: [...state.moveHistory, [matchedId1, matchedId2]],
 				});
 
+				get().saveGame();
 				queueMicrotask(() => get().updatePossibleMoves());
 			} else {
-				set({
-					selectedTile: tile,
-					tiles: state.tiles.map((t) => ({
-						...t,
-						isSelected: t.id === tile.id,
-					})),
-				});
+				playSelectSound(state.soundMuted);
+				set({ selectedTileId: tile.id, hintPair: null });
 			}
 		},
 
-		resetGame: () => {
+		clearSelection: () => set({ selectedTileId: null, hintPair: null }),
+
+		showHint: () => {
 			const state = get();
+			if (state.gameOver || state.viewState !== "playing") return;
+
+			const moves = findAvailableMoves(state.tiles, state.grid);
+			if (moves.length === 0) return;
+
+			let bestMove = moves[0];
+			let bestLayerScore = bestMove.tile1.layer + bestMove.tile2.layer;
+			for (let i = 1; i < moves.length; i++) {
+				const score = moves[i].tile1.layer + moves[i].tile2.layer;
+				if (score > bestLayerScore) {
+					bestLayerScore = score;
+					bestMove = moves[i];
+				}
+			}
+
+			playSelectSound(state.soundMuted);
+			set({
+				hintPair: [bestMove.tile1.id, bestMove.tile2.id],
+				selectedTileId: null,
+			});
+		},
+
+		toggleHighlightFreeTiles: () => {
+			const next = !get().highlightFreeTiles;
+			persistHighlightFree(next);
+			set({ highlightFreeTiles: next });
+		},
+
+		toggleSoundMuted: () => {
+			const next = !get().soundMuted;
+			persistSoundMuted(next);
+			set({ soundMuted: next });
+		},
+
+		resetGame: (requestedLayoutId) => {
+			const state = get();
+			const layoutId = requestedLayoutId ?? state.layoutId;
 
 			if (state.timerIntervalId) {
 				clearInterval(state.timerIntervalId);
 			}
+			clearSavedGame();
+
+			const newTiles = generateInitialLayout(
+				undefined,
+				LAYOUTS[layoutId].layers,
+			);
+			const newGrid = createTileGrid(newTiles);
+			const moves = findAvailableMoves(newTiles, newGrid);
 
 			set({
-				isLoading: true,
-				viewState: "loading",
+				tiles: newTiles,
+				grid: newGrid,
+				remainingTiles: newGrid.size,
+				possibleMoves: moves.length,
+				viewState: "playing",
 				startTime: null,
 				elapsedTime: 0,
 				timerIntervalId: null,
 				gameOver: false,
 				isGameWon: false,
-				selectedTile: null,
-				possibleMoves: 0,
-				previousTiles: null,
-				previousGrid: null,
+				selectedTileId: null,
+				hintPair: null,
+				moveHistory: [],
 				isDailyMode: false,
+				layoutId,
+				boardVersion: state.boardVersion + 1,
 			});
-
-			const generate = () => {
-				const newTiles = generateInitialLayout();
-				const newGrid = createTileGrid(newTiles);
-
-				set({
-					tiles: newTiles,
-					grid: newGrid,
-					isLoading: false,
-					viewState: "playing",
-				});
-
-				queueMicrotask(() => get().updatePossibleMoves());
-			};
-
-			if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-				window.requestIdleCallback(generate, { timeout: 100 });
-			} else {
-				setTimeout(generate, 16);
-			}
 		},
 
-		startDailyPuzzle: () => {
+		startDailyPuzzle: (forceRestart = false) => {
+			if (!forceRestart) {
+				const saved = readSavedGame();
+				if (saved?.isDailyMode && saved.puzzleDate === getDateString()) {
+					if (get().loadGame()) return;
+				}
+			}
+
 			const state = get();
 
 			if (state.timerIntervalId) {
 				clearInterval(state.timerIntervalId);
 			}
+			clearSavedGame();
 
 			const puzzleNumber = getPuzzleNumber();
 			const puzzleDate = getDateString();
+			const dailyLayout = getDailyLayout(puzzleNumber);
+			const seed = getDailySeed();
+			const rng = new SeededRandom(seed);
+			const newTiles = generateInitialLayout(rng, dailyLayout.layers);
+			const newGrid = createTileGrid(newTiles);
+			const moves = findAvailableMoves(newTiles, newGrid);
 
 			set({
-				isLoading: true,
-				viewState: "loading",
+				tiles: newTiles,
+				grid: newGrid,
+				remainingTiles: newGrid.size,
+				possibleMoves: moves.length,
+				viewState: "playing",
 				startTime: null,
 				elapsedTime: 0,
 				timerIntervalId: null,
 				gameOver: false,
 				isGameWon: false,
-				selectedTile: null,
-				possibleMoves: 0,
-				previousTiles: null,
-				previousGrid: null,
+				selectedTileId: null,
+				hintPair: null,
+				moveHistory: [],
 				isDailyMode: true,
+				layoutId: dailyLayout.id,
+				boardVersion: state.boardVersion + 1,
 				puzzleNumber,
 				puzzleDate,
 			});
-
-			const generate = () => {
-				const seed = getDailySeed();
-				const rng = new SeededRandom(seed);
-				const newTiles = generateInitialLayout(rng);
-				const newGrid = createTileGrid(newTiles);
-
-				set({
-					tiles: newTiles,
-					grid: newGrid,
-					isLoading: false,
-					viewState: "playing",
-				});
-
-				queueMicrotask(() => get().updatePossibleMoves());
-			};
-
-			if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-				window.requestIdleCallback(generate, { timeout: 100 });
-			} else {
-				setTimeout(generate, 16);
-			}
 		},
 
-		setLoading: (loading) => set({ isLoading: loading }),
+		resumeSavedGame: () => get().loadGame(),
 
 		updatePossibleMoves: () => {
 			const state = get();
-			const activeTiles = state.tiles.filter((t) => !t.isRemoved);
+			const activeCount = state.grid.size;
 
-			if (activeTiles.length === 0) {
+			if (activeCount === 0 && state.tiles.length > 0) {
 				get().stopTimer();
+				clearSavedGame();
+				const finalTime = get().elapsedTime;
+				playWinSound(state.soundMuted);
 				set({
 					gameOver: true,
 					isGameWon: true,
 					possibleMoves: 0,
+					remainingTiles: 0,
 					viewState: "gameOver",
 				});
 
-				// Record completion in daily mode
 				if (state.isDailyMode) {
-					recordCompletion(state.elapsedTime);
+					recordCompletion(finalTime);
+				} else {
+					recordRandomTime(finalTime);
 				}
 				return;
 			}
@@ -243,6 +406,7 @@ export const useGameStore = create<GameState>()(
 
 			if (moves.length === 0) {
 				get().stopTimer();
+				clearSavedGame();
 				set({
 					gameOver: true,
 					isGameWon: false,
@@ -250,7 +414,7 @@ export const useGameStore = create<GameState>()(
 					viewState: "gameOver",
 				});
 			} else {
-				set({ possibleMoves: moves.length });
+				set({ possibleMoves: moves.length, remainingTiles: activeCount });
 			}
 		},
 
@@ -261,8 +425,11 @@ export const useGameStore = create<GameState>()(
 				clearInterval(state.timerIntervalId);
 			}
 
-			const startTime = Date.now();
-			const intervalId = window.setInterval(() => get().updateTimer(), 1000);
+			const startTime = Date.now() - state.elapsedTime * 1000;
+			const intervalId =
+				typeof window !== "undefined"
+					? window.setInterval(() => get().updateTimer(), 1000)
+					: null;
 
 			set({ startTime, timerIntervalId: intervalId });
 		},
@@ -292,86 +459,121 @@ export const useGameStore = create<GameState>()(
 
 		undo: () => {
 			const state = get();
-			if (state.previousTiles && state.previousGrid) {
-				set({
-					tiles: state.previousTiles,
-					grid: state.previousGrid,
-					previousTiles: null,
-					previousGrid: null,
-					selectedTile: null,
-				});
-				queueMicrotask(() => get().updatePossibleMoves());
-			}
+			if (state.moveHistory.length === 0) return;
+
+			const [id1, id2] = state.moveHistory[state.moveHistory.length - 1];
+			const restoredTiles = state.tiles.map((t) =>
+				t.id === id1 || t.id === id2 ? { ...t, isRemoved: false } : t,
+			);
+			const newGrid = createTileGrid(restoredTiles);
+			const updatedTiles = withAccessibility(restoredTiles, newGrid);
+
+			playSelectSound(state.soundMuted);
+			set({
+				tiles: updatedTiles,
+				grid: newGrid,
+				remainingTiles: newGrid.size,
+				moveHistory: state.moveHistory.slice(0, -1),
+				selectedTileId: null,
+				hintPair: null,
+			});
+			get().saveGame();
+			queueMicrotask(() => get().updatePossibleMoves());
 		},
 
 		goHome: () => {
 			const state = get();
 
-			if (state.timerIntervalId) {
+			if (state.viewState === "playing" && !state.gameOver) {
+				get().stopTimer();
+				if (get().moveHistory.length > 0 || get().elapsedTime > 0) {
+					get().saveGame();
+				}
+			} else if (state.timerIntervalId) {
 				clearInterval(state.timerIntervalId);
 			}
 
 			set({
 				tiles: [],
 				grid: new Map(),
-				selectedTile: null,
+				selectedTileId: null,
+				hintPair: null,
 				gameOver: false,
 				isGameWon: false,
-				isLoading: false,
 				viewState: "home",
 				possibleMoves: 0,
+				remainingTiles: 0,
 				startTime: null,
 				elapsedTime: 0,
 				timerIntervalId: null,
-				previousTiles: null,
-				previousGrid: null,
+				moveHistory: [],
 			});
 		},
 
 		saveGame: () => {
 			const state = get();
-			const saveData = {
+			if (state.gameOver || state.tiles.length === 0) return;
+
+			const elapsedTime = state.startTime
+				? Math.floor((Date.now() - state.startTime) / 1000)
+				: state.elapsedTime;
+
+			const payload: SavedGamePayload = {
+				version: SAVE_SCHEMA_VERSION,
 				tiles: state.tiles,
-				grid: Array.from(state.grid.entries()),
-				selectedTile: state.selectedTile,
-				gameOver: state.gameOver,
-				isGameWon: state.isGameWon,
-				isLoading: state.isLoading,
-				possibleMoves: state.possibleMoves,
-				startTime: state.startTime,
-				elapsedTime: state.elapsedTime,
-				timerIntervalId: null, // don't save interval
-				previousTiles: state.previousTiles,
-				previousGrid: state.previousGrid
-					? Array.from(state.previousGrid.entries())
-					: null,
+				moveHistory: state.moveHistory,
+				isDailyMode: state.isDailyMode,
+				layoutId: state.layoutId,
+				puzzleNumber: state.puzzleNumber,
+				puzzleDate: state.puzzleDate,
+				remainingTiles: state.grid.size,
+				elapsedTime,
 			};
-			localStorage.setItem("mahjong-save", JSON.stringify(saveData));
+
+			try {
+				localStorage.setItem(ACTIVE_SAVE_KEY, JSON.stringify(payload));
+			} catch {}
 		},
 
 		loadGame: () => {
-			const saved = localStorage.getItem("mahjong-save");
-			if (saved) {
-				const saveData = JSON.parse(saved);
-				set({
-					tiles: saveData.tiles,
-					grid: new Map(saveData.grid),
-					selectedTile: saveData.selectedTile,
-					gameOver: saveData.gameOver,
-					isGameWon: saveData.isGameWon,
-					isLoading: saveData.isLoading,
-					possibleMoves: saveData.possibleMoves,
-					startTime: saveData.startTime,
-					elapsedTime: saveData.elapsedTime,
-					timerIntervalId: null,
-					previousTiles: saveData.previousTiles,
-					previousGrid: saveData.previousGrid
-						? new Map(saveData.previousGrid)
-						: null,
-				});
-				return true;
+			const saved = readSavedGame();
+			if (!saved) return false;
+
+			const state = get();
+			if (state.timerIntervalId) {
+				clearInterval(state.timerIntervalId);
 			}
-			return false;
+
+			const grid = createTileGrid(saved.tiles);
+			const tiles = withAccessibility(saved.tiles, grid);
+			const moves = findAvailableMoves(tiles, grid);
+
+			set({
+				tiles,
+				grid,
+				remainingTiles: grid.size,
+				possibleMoves: moves.length,
+				selectedTileId: null,
+				hintPair: null,
+				gameOver: false,
+				isGameWon: false,
+				viewState: "playing",
+				startTime: null,
+				elapsedTime: saved.elapsedTime,
+				timerIntervalId: null,
+				moveHistory: saved.moveHistory,
+				isDailyMode: saved.isDailyMode,
+				layoutId: saved.layoutId,
+				boardVersion: state.boardVersion + 1,
+				puzzleNumber: saved.puzzleNumber,
+				puzzleDate: saved.puzzleDate,
+			});
+
+			if (saved.elapsedTime > 0 || saved.moveHistory.length > 0) {
+				get().startTimer();
+			}
+
+			return true;
 		},
 	})),
 );

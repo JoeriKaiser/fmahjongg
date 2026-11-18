@@ -10,7 +10,6 @@ export interface TileData {
 	position: Position;
 	gridPosition: Position;
 	layer: number;
-	isSelected: boolean;
 	isRemoved: boolean;
 	isAccessible: boolean;
 }
@@ -21,4 +20,4 @@ export interface TileNeighbors {
 	right: boolean;
 }
 
-export type TileGrid = Map<string, TileData>;
+export type TileGrid = Map<number, TileData>;

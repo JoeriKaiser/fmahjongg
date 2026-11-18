@@ -1,7 +1,15 @@
 import type { TileData, TileGrid, TileNeighbors } from "../types";
 
-export function createGridKey(x: number, y: number, z: number): string {
-	return `${x},${y},${z}`;
+const GRID_OFFSET = 64;
+const GRID_STRIDE_X = 256;
+const GRID_STRIDE_Y = 65536;
+
+export function createGridKey(x: number, y: number, z: number): number {
+	return (
+		(y + GRID_OFFSET) * GRID_STRIDE_Y +
+		(x + GRID_OFFSET) * GRID_STRIDE_X +
+		(z + GRID_OFFSET)
+	);
 }
 
 export function createTileGrid(tiles: TileData[]): TileGrid {
@@ -33,18 +41,10 @@ export function hasBlockingTileAbove(
 ): boolean {
 	const aboveLayer = y + 1;
 
-	const positionsToCheck = [
-		[x, aboveLayer, z],
-		[x - 1, aboveLayer, z],
-		[x + 1, aboveLayer, z],
-		[x, aboveLayer, z - 1],
-		[x, aboveLayer, z + 1],
-	];
-
-	for (const [px, py, pz] of positionsToCheck) {
-		const tile = getTileAt(grid, px, py, pz);
-		if (tile && !tile.isRemoved) {
-			if (tilesOverlapVertically(tile, x, z)) {
+	for (let dx = -1; dx <= 1; dx++) {
+		for (let dz = -1; dz <= 1; dz++) {
+			const tile = getTileAt(grid, x + dx, aboveLayer, z + dz);
+			if (tile && !tile.isRemoved) {
 				return true;
 			}
 		}
@@ -53,45 +53,40 @@ export function hasBlockingTileAbove(
 	return false;
 }
 
-function tilesOverlapVertically(
-	upperTile: TileData,
-	lowerX: number,
-	lowerZ: number,
+function hasBlockingTileOnSide(
+	grid: TileGrid,
+	x: number,
+	y: number,
+	z: number,
+	dx: -2 | 2,
 ): boolean {
-	const { x: ux, z: uz } = upperTile.gridPosition;
-	const id = upperTile.id;
+	const neighborX = x + dx;
 
-	const isSplit = id.includes("-split");
-	const isType3 = id.includes("type3") || (isSplit && upperTile.layer === 4);
-
-	if (isType3) {
-		return (
-			lowerX >= ux - 0.5 &&
-			lowerX <= ux + 1.5 &&
-			lowerZ >= uz - 0.5 &&
-			lowerZ <= uz + 1.5
-		);
-	} else if (isSplit) {
-		return lowerX === ux && lowerZ >= uz - 0.5 && lowerZ <= uz + 1.5;
-	} else {
-		return lowerX === ux && lowerZ === uz;
+	for (let dz = -1; dz <= 1; dz++) {
+		const tile = getTileAt(grid, neighborX, y, z + dz);
+		if (tile && !tile.isRemoved) {
+			return true;
+		}
 	}
+
+	return false;
 }
 
 export function getNeighbors(tile: TileData, grid: TileGrid): TileNeighbors {
 	const { x, y, z } = tile.gridPosition;
 
-	const top = hasBlockingTileAbove(grid, x, y, z);
-
-	const leftTile = getTileAt(grid, x - 1, y, z);
-	const left = leftTile !== undefined && !leftTile.isRemoved;
-
-	const rightTile = getTileAt(grid, x + 1, y, z);
-	const right = rightTile !== undefined && !rightTile.isRemoved;
-
-	return { top, left, right };
+	return {
+		top: hasBlockingTileAbove(grid, x, y, z),
+		left: hasBlockingTileOnSide(grid, x, y, z, -2),
+		right: hasBlockingTileOnSide(grid, x, y, z, 2),
+	};
 }
 
 export function isAccessible(neighbors: TileNeighbors): boolean {
 	return !neighbors.top && (!neighbors.left || !neighbors.right);
+}
+
+export function isTileAccessible(tile: TileData, grid: TileGrid): boolean {
+	if (tile.isRemoved) return false;
+	return isAccessible(getNeighbors(tile, grid));
 }
